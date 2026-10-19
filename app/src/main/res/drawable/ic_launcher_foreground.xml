@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Barre -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,51.5h44v5h-44z" />
+    <!-- Disques extérieurs -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,38h6a2,2 0,0 1,2 2v28a2,2 0,0 1,-2 2h-6a2,2 0,0 1,-2 -2v-28a2,2 0,0 1,2 -2z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,38h6a2,2 0,0 1,2 2v28a2,2 0,0 1,-2 2h-6a2,2 0,0 1,-2 -2v-28a2,2 0,0 1,2 -2z" />
+    <!-- Disques intérieurs -->
+    <path
+        android:fillColor="#CCFFFFFF"
+        android:pathData="M46.5,44h3a1.5,1.5 0,0 1,1.5 1.5v17a1.5,1.5 0,0 1,-1.5 1.5h-3a1.5,1.5 0,0 1,-1.5 -1.5v-17a1.5,1.5 0,0 1,1.5 -1.5z" />
+    <path
+        android:fillColor="#CCFFFFFF"
+        android:pathData="M58.5,44h3a1.5,1.5 0,0 1,1.5 1.5v17a1.5,1.5 0,0 1,-1.5 1.5h-3a1.5,1.5 0,0 1,-1.5 -1.5v-17a1.5,1.5 0,0 1,1.5 -1.5z" />
+</vector>
