@@ -73,7 +73,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToLong
 
-private const val WEIGHT_STEP = 2.5
+private const val WEIGHT_STEP = 1.25
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
