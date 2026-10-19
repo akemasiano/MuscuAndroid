@@ -12,19 +12,19 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Installer Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Installer Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "8.9"
 
@@ -53,7 +53,7 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "dist/muscu-${GITHUB_RUN_NUMBER}.apk"
 
       - name: Publier l'APK (artefact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: muscu-apk
           path: dist/*.apk
@@ -61,6 +61,6 @@ jobs:
 
       - name: Créer une Release GitHub (sur tag v*)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*.apk
