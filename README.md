@@ -5,7 +5,7 @@ Application Android (Kotlin, Jetpack Compose, Room) pour suivre ses séances sem
 ## Fonctionnalités
 
 - **Ma semaine** : navigation par semaine (n° ISO), sélection du jour, coche verte sur les jours entraînés, liste des exercices du jour avec la performance précédente.
-- **Ajouter à la séance** : choix de l'exercice, séries / répétitions / poids (pas de 0,25 kg, saisie libre possible), **pré-remplissage automatique avec la dernière valeur saisie pour cet exercice**. Un appui sur une entrée permet de la modifier ou la supprimer.
+- **Ajouter à la séance** : choix de l'exercice, séries / répétitions / poids (pas de 0,25 kg, appui prolongé sur + pour augmenter le poids en continu jusqu'au relâchement, saisie libre possible), **pré-remplissage automatique avec la dernière valeur saisie pour cet exercice**. Un appui sur une entrée permet de la modifier ou la supprimer.
 - **Mes exercices** : bibliothèque avec recherche (insensible aux accents), dernière performance et ancienneté.
 - **Nouvel exercice** : nom, couleur, photo depuis la galerie ou l'appareil photo ; modification et suppression.
 - Données stockées localement (base Room `muscu.db`), aucune connexion requise.

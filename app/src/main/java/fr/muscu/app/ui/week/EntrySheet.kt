@@ -193,6 +193,7 @@ fun EntrySheet(
                 label = "Poids (kg)",
                 onMinus = { weightText = formatWeight(roundKg(max(0.0, (weight ?: 0.0) - WEIGHT_STEP))) },
                 onPlus = { weightText = formatWeight(roundKg((weight ?: 0.0) + WEIGHT_STEP)) },
+                repeatPlusOnHold = true,
             ) {
                 BasicTextField(
                     value = weightText,
@@ -256,6 +257,7 @@ private fun StepperRow(
     label: String,
     onMinus: () -> Unit,
     onPlus: () -> Unit,
+    repeatPlusOnHold: Boolean = false,
     value: @Composable () -> Unit,
 ) {
     Row(
@@ -270,7 +272,7 @@ private fun StepperRow(
         Text(label, color = MuscuColors.TextSecondary, modifier = Modifier.weight(1f))
         CircleIconButton(Icons.Default.Remove, "Moins", onMinus, size = 42.dp)
         value()
-        CircleIconButton(Icons.Default.Add, "Plus", onPlus, size = 42.dp)
+        CircleIconButton(Icons.Default.Add, "Plus", onPlus, size = 42.dp, repeatOnHold = repeatPlusOnHold)
     }
 }
 
