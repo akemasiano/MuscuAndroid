@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -73,8 +78,9 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
             item {
                 WeekHeader(
                     weekStart = state.weekStart,
-                    isCurrentWeek = state.weekStart == LocalDate.now()
+                    isCurrentWeek = state.weekStart == state.today
                         .with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
+                    streak = state.weeklyStreak,
                     onPrevious = vm::previousWeek,
                     onNext = vm::nextWeek,
                     onToday = vm::goToToday,
@@ -85,6 +91,7 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
                     weekStart = state.weekStart,
                     selected = state.selectedDate,
                     daysWithEntries = state.daysWithEntries,
+                    today = state.today,
                     onSelect = vm::selectDay,
                 )
             }
@@ -142,18 +149,24 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeekHeader(
     weekStart: LocalDate,
     isCurrentWeek: Boolean,
+    streak: Int,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionLabel("Semaine ${weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel("Semaine ${weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}")
+                    Spacer(Modifier.width(8.dp))
+                    WeeklyStreakBadge(streak)
+                }
                 if (!isCurrentWeek) {
                     TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 8.dp)) {
                         Text("Aujourd’hui", color = MuscuColors.Primary)
@@ -165,6 +178,34 @@ private fun WeekHeader(
         CircleIconButton(Icons.Default.ChevronLeft, "Semaine précédente", onPrevious)
         Spacer(Modifier.width(10.dp))
         CircleIconButton(Icons.Default.ChevronRight, "Semaine suivante", onNext)
+    }
+}
+
+@Composable
+private fun WeeklyStreakBadge(streak: Int) {
+    val description = if (streak == 1) "1 semaine consécutive validée"
+        else "$streak semaines consécutives validées"
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MuscuColors.StreakLight)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .clearAndSetSemantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            Icons.Default.LocalFireDepartment,
+            contentDescription = null,
+            tint = MuscuColors.StreakFlame,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            streak.toString(),
+            color = MuscuColors.StreakText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -186,9 +227,9 @@ private fun DayStrip(
     weekStart: LocalDate,
     selected: LocalDate,
     daysWithEntries: Set<LocalDate>,
+    today: LocalDate,
     onSelect: (LocalDate) -> Unit,
 ) {
-    val today = LocalDate.now()
     Row(
         Modifier
             .fillMaxWidth()

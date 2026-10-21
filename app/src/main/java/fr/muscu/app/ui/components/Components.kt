@@ -152,7 +152,7 @@ fun CircleIconButton(
             repeating = false
         } else if (repeating) {
             while (true) {
-                delay(100)
+                delay(50)
                 currentOnClick()
             }
         }
