@@ -1,9 +1,14 @@
 package fr.muscu.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +29,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import fr.muscu.app.data.EXERCISE_ASSET_PREFIX
 import fr.muscu.app.ui.theme.MuscuColors
+import kotlinx.coroutines.delay
 import java.io.File
 
 private fun exerciseImageModel(path: String): Any =
@@ -174,6 +186,7 @@ fun PerfChip(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CircleIconButton(
     icon: ImageVector,
@@ -182,14 +195,46 @@ fun CircleIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     enabled: Boolean = true,
+    repeatOnHold: Boolean = false,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val currentOnClick by rememberUpdatedState(onClick)
+    var repeating by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isPressed, enabled, repeatOnHold, repeating) {
+        if (!isPressed || !enabled || !repeatOnHold) {
+            repeating = false
+        } else if (repeating) {
+            while (true) {
+                delay(50)
+                currentOnClick()
+            }
+        }
+    }
+
     Box(
         modifier
             .size(size)
             .clip(CircleShape)
             .background(MuscuColors.Surface)
             .border(1.dp, MuscuColors.Border, CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .then(
+                if (repeatOnHold) {
+                    Modifier.combinedClickable(
+                        enabled = enabled,
+                        interactionSource = interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = onClick,
+                        onLongClick = {
+                            currentOnClick()
+                            repeating = true
+                        },
+                    )
+                } else {
+                    Modifier.clickable(enabled = enabled, onClick = onClick)
+                }
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

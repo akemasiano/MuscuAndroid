@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import fr.muscu.app.data.Exercise
 import fr.muscu.app.data.MuscuRepository
 import fr.muscu.app.data.WorkoutEntry
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -26,6 +29,8 @@ data class WeekUiState(
     val daysWithEntries: Set<LocalDate> = emptySet(),
     val dayEntries: List<DayEntryUi> = emptyList(),
     val exercises: List<Exercise> = emptyList(),
+    val weeklyStreak: Int = 0,
+    val today: LocalDate = LocalDate.now(),
 ) {
     val weekStart: LocalDate
         get() = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -34,8 +39,14 @@ data class WeekUiState(
 class WeekViewModel(private val repo: MuscuRepository) : ViewModel() {
 
     private val selected = MutableStateFlow(LocalDate.now())
+    private val today = flow {
+        while (true) {
+            emit(LocalDate.now())
+            delay(60_000)
+        }
+    }.distinctUntilChanged()
 
-    val state = combine(selected, repo.exercises, repo.entries) { date, exercises, entries ->
+    val state = combine(selected, repo.exercises, repo.entries, today) { date, exercises, entries, today ->
         val exercisesById = exercises.associateBy { it.id }
         val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val range = weekStart.toEpochDay()..weekStart.plusDays(6).toEpochDay()
@@ -55,6 +66,8 @@ class WeekViewModel(private val repo: MuscuRepository) : ViewModel() {
                 DayEntryUi(entry, exercise, history.getOrNull(history.indexOf(entry) - 1))
             },
             exercises = exercises,
+            weeklyStreak = weeklyStreak(entries, date, today),
+            today = today,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WeekUiState())
 

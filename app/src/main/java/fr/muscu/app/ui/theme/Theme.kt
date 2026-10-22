@@ -19,6 +19,9 @@ object MuscuColors {
     val Text = Color(0xFF1C1C1A)
     val TextSecondary = Color(0xFF7A7770)
     val Danger = Color(0xFFB3261E)
+    val StreakLight = Color(0xFFFCE8D7)
+    val StreakText = Color(0xFFA64F16)
+    val StreakFlame = Color(0xFFE78232)
 
     /** Dégradés des vignettes d'exercice. */
     val Palette: List<Pair<Color, Color>> = listOf(
