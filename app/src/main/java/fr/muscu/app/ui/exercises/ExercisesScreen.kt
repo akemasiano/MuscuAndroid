@@ -125,7 +125,7 @@ private fun ExerciseRow(item: ExerciseItem, onClick: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExerciseAvatar(item.exercise.colorIndex, item.exercise.imagePath, 58.dp, corner = 14.dp)
+        ExerciseAvatar(item.exercise.colorIndex, item.exercise.imagePath ?: item.exercise.endImagePath, 58.dp, corner = 14.dp)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(item.exercise.name, style = MaterialTheme.typography.titleMedium)

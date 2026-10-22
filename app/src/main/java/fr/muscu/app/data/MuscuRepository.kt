@@ -1,12 +1,17 @@
 package fr.muscu.app.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import java.util.UUID
 
@@ -35,6 +40,7 @@ class MuscuRepository(
             exerciseDao.delete(exercise.id)
         }
         deleteImage(exercise.imagePath)
+        deleteImage(exercise.endImagePath)
     }
 
     /** Dernière valeur saisie pour cet exercice (pour pré-remplir la saisie). */
@@ -65,24 +71,68 @@ class MuscuRepository(
     // --- Images d'exercice (stockées dans le stockage interne de l'app) ---
 
     private val imagesDir: File
-        get() = File(context.filesDir, "exercise_images").apply { mkdirs() }
+        get() = File(context.filesDir, "exercise_images").apply {
+            if (!isDirectory && !mkdirs()) throw IOException("Unable to create image directory")
+        }
 
     fun newImageFile(): File = File(imagesDir, "${UUID.randomUUID()}.jpg")
 
     fun uriForFile(file: File): Uri =
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
-    suspend fun importImage(uri: Uri): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val target = newImageFile()
-            context.contentResolver.openInputStream(uri)!!.use { input ->
-                target.outputStream().use { input.copyTo(it) }
+    suspend fun importImage(uri: Uri): String? {
+        var target: File? = null
+        return try {
+            withContext(Dispatchers.IO) {
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    val longest = maxOf(info.size.width, info.size.height)
+                    if (longest > 1600) {
+                        decoder.setTargetSize(
+                            maxOf(1, (info.size.width * 1600L / longest).toInt()),
+                            maxOf(1, (info.size.height * 1600L / longest).toInt()),
+                        )
+                    }
+                }
+                try {
+                    val transparent = bitmap.hasAlpha()
+                    val output = File(imagesDir, "${UUID.randomUUID()}.${if (transparent) "png" else "jpg"}")
+                    target = output
+                    output.outputStream().use { stream ->
+                        val format = if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+                        if (!bitmap.compress(format, 90, stream)) throw IOException("Image encoding failed")
+                    }
+                    output.absolutePath
+                } finally {
+                    bitmap.recycle()
+                }
             }
-            target.absolutePath
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            deleteImage(target?.absolutePath)
+            throw e
+        } catch (e: IOException) {
+            Log.e("MuscuImages", "Unable to import image", e)
+            deleteImage(target?.absolutePath)
+            null
+        } catch (e: SecurityException) {
+            Log.e("MuscuImages", "Image access denied", e)
+            deleteImage(target?.absolutePath)
+            null
+        } catch (e: IllegalArgumentException) {
+            Log.e("MuscuImages", "Unsupported image", e)
+            deleteImage(target?.absolutePath)
+            null
+        }
     }
 
     fun deleteImage(path: String?) {
-        if (path != null) runCatching { File(path).delete() }
+        if (path == null || path.startsWith(EXERCISE_ASSET_PREFIX)) return
+        try {
+            val file = File(path)
+            if (file.exists() && !file.delete()) Log.w("MuscuImages", "Unable to delete image")
+        } catch (e: SecurityException) {
+            Log.e("MuscuImages", "Image deletion denied", e)
+        }
     }
 }

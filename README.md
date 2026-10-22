@@ -7,8 +7,25 @@ Application Android (Kotlin, Jetpack Compose, Room) pour suivre ses séances sem
 - **Ma semaine** : navigation par semaine (n° ISO), sélection du jour, coche verte sur les jours entraînés, liste des exercices du jour avec la performance précédente.
 - **Ajouter à la séance** : choix de l'exercice, séries / répétitions / poids (pas de 1,25 kg, saisie libre possible), **pré-remplissage automatique avec la dernière valeur saisie pour cet exercice**. Un appui sur une entrée permet de la modifier ou la supprimer.
 - **Mes exercices** : bibliothèque avec recherche (insensible aux accents), dernière performance et ancienneté.
-- **Nouvel exercice** : nom, couleur, photo depuis la galerie ou l'appareil photo ; modification et suppression.
+- **Catalogue intégré** : 20 exercices illustrés prêts à sélectionner, avec 40 images Départ / Fin embarquées dans l'APK et disponibles hors ligne. Les planches fournies sont séparées, leurs titres retirés et les deux phases gardent la même échelle, sans agrandissement.
+- **Nouvel exercice** : nom, couleur, deux images facultatives **Départ / Fin** depuis la galerie ou l'appareil photo ; remplacement, retrait indépendant et inversion des phases.
+- **Images** : les deux phases s'affichent côte à côte dans l'édition et la saisie d'une séance, sans recadrage. La liste « Ma semaine » garde sa vignette de **72 × 72 dp**, avec l'image de fin en priorité, puis celle de départ, sinon l'haltère colorée.
+- **Import optimisé** : orientation corrigée, proportions et transparence conservées, côté le plus long limité à **1 600 pixels**, sans agrandissement. Stockage en JPEG (qualité 90) ou PNG si l'image possède un canal alpha. Les images déjà enregistrées sont conservées comme images de départ, sans recompression.
 - Données stockées localement (base Room `muscu.db`), aucune connexion requise.
+
+### Exercices illustrés inclus
+
+Développé militaire, développé couché, curl haltère incliné, curl à la barre,
+élévations latérales, barre au front, rowing barre, curl concentré,
+développé incliné avec haltères, curl haltère debout sur banc incliné, curl Spider,
+tractions, dips sur banc, curl marteau, croix de fer avec haltères, kickback,
+waiter curl, curl inversé à la barre, tirage bûcheron et élévation frontale avec un haltère.
+
+À la première installation, le catalogue complète les exercices par défaut. Lors
+de la mise à jour, les exercices de même nom sont réutilisés, les images manquantes
+sont ajoutées et les photos personnalisées, identifiants et historiques sont conservés.
+Le catalogue est ajouté une seule fois : les suppressions et modifications ultérieures
+restent respectées. Ses images sont des ressources intégrées, distinctes des photos importées.
 
 ## Structure
 

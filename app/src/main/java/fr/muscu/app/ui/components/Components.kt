@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -37,8 +39,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import fr.muscu.app.data.EXERCISE_ASSET_PREFIX
 import fr.muscu.app.ui.theme.MuscuColors
 import java.io.File
+
+private fun exerciseImageModel(path: String): Any =
+    if (path.startsWith(EXERCISE_ASSET_PREFIX)) path else File(path)
 
 /** Haltère dessinée, fidèle au style des maquettes. */
 @Composable
@@ -84,13 +90,62 @@ fun ExerciseAvatar(
     ) {
         if (imagePath != null) {
             AsyncImage(
-                model = File(imagePath),
+                model = exerciseImageModel(imagePath),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().background(MuscuColors.Surface),
             )
         } else {
             DumbbellIcon(Modifier.size(size * 0.58f))
+        }
+    }
+}
+
+@Composable
+fun ExercisePhases(
+    startImagePath: String?,
+    endImagePath: String?,
+    modifier: Modifier = Modifier,
+    onEdit: ((Boolean) -> Unit)? = null,
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(false to startImagePath, true to endImagePath).forEach { (isEnd, path) ->
+            val label = if (isEnd) "Fin" else "Départ"
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MuscuColors.Surface)
+                    .border(1.dp, MuscuColors.Border, RoundedCornerShape(16.dp))
+                    .then(if (onEdit != null) Modifier.clickable { onEdit(isEnd) } else Modifier)
+                    .padding(12.dp),
+            ) {
+                Text(label, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth().aspectRatio(0.85f), contentAlignment = Alignment.Center) {
+                    if (path != null) {
+                        AsyncImage(
+                            model = exerciseImageModel(path),
+                            contentDescription = "Position de ${if (isEnd) "fin" else "départ"}",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            DumbbellIcon(Modifier.size(48.dp), MuscuColors.Primary)
+                            Text("Sans image", color = MuscuColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                if (onEdit != null) {
+                    Text(
+                        if (path == null) "Ajouter" else "Modifier",
+                        color = MuscuColors.Primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
+                    )
+                }
+            }
         }
     }
 }

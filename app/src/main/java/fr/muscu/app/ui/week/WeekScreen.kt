@@ -253,7 +253,7 @@ private fun EntryCard(item: DayEntryUi, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExerciseAvatar(item.exercise.colorIndex, item.exercise.imagePath, 72.dp)
+        ExerciseAvatar(item.exercise.colorIndex, item.exercise.endImagePath ?: item.exercise.imagePath, 72.dp)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(item.exercise.name, style = MaterialTheme.typography.titleMedium)

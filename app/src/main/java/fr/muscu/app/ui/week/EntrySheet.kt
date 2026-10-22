@@ -65,6 +65,7 @@ import fr.muscu.app.data.parseWeight
 import fr.muscu.app.data.perf
 import fr.muscu.app.ui.components.CircleIconButton
 import fr.muscu.app.ui.components.ExerciseAvatar
+import fr.muscu.app.ui.components.ExercisePhases
 import fr.muscu.app.ui.components.PrimaryButton
 import fr.muscu.app.ui.theme.MuscuColors
 import kotlinx.coroutines.launch
@@ -158,6 +159,13 @@ fun EntrySheet(
                 onSelect = { exerciseId = it.id },
                 onCreateExercise = onCreateExercise,
             )
+
+            if (exercise.imagePath != null || exercise.endImagePath != null) {
+                ExercisePhases(
+                    startImagePath = exercise.imagePath,
+                    endImagePath = exercise.endImagePath,
+                )
+            }
 
             Row(
                 Modifier
@@ -291,7 +299,7 @@ private fun ExercisePickerCard(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExerciseAvatar(exercise.colorIndex, exercise.imagePath, 110.dp, corner = 20.dp)
+        ExerciseAvatar(exercise.colorIndex, exercise.endImagePath ?: exercise.imagePath, 58.dp, corner = 14.dp)
         Spacer(Modifier.width(18.dp))
         Column(Modifier.weight(1f)) {
             Text(exercise.name, style = MaterialTheme.typography.titleLarge)
@@ -321,7 +329,7 @@ private fun ExercisePickerCard(
                                     fontWeight = if (ex.id == exercise.id) FontWeight.Bold else FontWeight.Normal,
                                 )
                             },
-                            leadingIcon = { ExerciseAvatar(ex.colorIndex, ex.imagePath, 32.dp) },
+                            leadingIcon = { ExerciseAvatar(ex.colorIndex, ex.imagePath ?: ex.endImagePath, 32.dp) },
                             onClick = {
                                 expanded = false
                                 onSelect(ex)

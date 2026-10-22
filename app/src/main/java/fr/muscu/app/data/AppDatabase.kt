@@ -4,9 +4,10 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Exercise::class, WorkoutEntry::class], version = 1, exportSchema = false)
+@Database(entities = [Exercise::class, WorkoutEntry::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun entryDao(): WorkoutEntryDao
@@ -23,6 +24,15 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "muscu.db")
+                .addMigrations(object : Migration(1, 2) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE exercises ADD COLUMN endImagePath TEXT")
+                    }
+                }, object : Migration(2, 3) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        ExerciseCatalog.seed(db)
+                    }
+                })
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         val now = System.currentTimeMillis()
@@ -32,6 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
                                 arrayOf<Any>(name, color, now),
                             )
                         }
+                        ExerciseCatalog.seed(db)
                     }
 
                     override fun onOpen(db: SupportSQLiteDatabase) {

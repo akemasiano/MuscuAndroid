@@ -12,6 +12,7 @@ data class Exercise(
     val colorIndex: Int,
     val imagePath: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    val endImagePath: String? = null,
 )
 
 /** Une entrée de séance : exercice réalisé un jour donné, ex. 3×10 @ 10 kg. */
