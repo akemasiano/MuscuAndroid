@@ -81,6 +81,7 @@ private const val WEIGHT_STEP = 0.25
 fun EntrySheet(
     date: LocalDate,
     exercises: List<Exercise>,
+    entryHistory: List<WorkoutEntry>,
     editing: WorkoutEntry?,
     initialExerciseId: Long?,
     loadLatest: suspend (exerciseId: Long, excludeEntryId: Long) -> WorkoutEntry?,
@@ -129,6 +130,9 @@ fun EntrySheet(
 
     val exercise = exercises.firstOrNull { it.id == exerciseId }
     val weight = parseWeight(weightText)
+    val recencyByExercise = remember(entryHistory, date, editing?.id) {
+        weeksSinceLastUse(entryHistory, date, editing?.id)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -156,6 +160,7 @@ fun EntrySheet(
             ExercisePickerCard(
                 exercise = exercise,
                 exercises = exercises,
+                recencyByExercise = recencyByExercise,
                 onSelect = { exerciseId = it.id },
                 onCreateExercise = onCreateExercise,
             )
@@ -288,6 +293,7 @@ private fun StepperRow(
 private fun ExercisePickerCard(
     exercise: Exercise,
     exercises: List<Exercise>,
+    recencyByExercise: Map<Long, Long>,
     onSelect: (Exercise) -> Unit,
     onCreateExercise: () -> Unit,
 ) {
@@ -305,6 +311,7 @@ private fun ExercisePickerCard(
         Spacer(Modifier.width(18.dp))
         Column(Modifier.weight(1f)) {
             Text(exercise.name, style = MaterialTheme.typography.titleLarge)
+            ExerciseRecency(recencyByExercise[exercise.id])
             Spacer(Modifier.height(8.dp))
             Box {
                 Row(
@@ -326,10 +333,13 @@ private fun ExercisePickerCard(
                     exercises.forEach { ex ->
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    ex.name,
-                                    fontWeight = if (ex.id == exercise.id) FontWeight.Bold else FontWeight.Normal,
-                                )
+                                Column {
+                                    Text(
+                                        ex.name,
+                                        fontWeight = if (ex.id == exercise.id) FontWeight.Bold else FontWeight.Normal,
+                                    )
+                                    ExerciseRecency(recencyByExercise[ex.id])
+                                }
                             },
                             leadingIcon = { ExerciseAvatar(ex.colorIndex, ex.imagePath ?: ex.endImagePath, 32.dp) },
                             onClick = {
@@ -350,6 +360,26 @@ private fun ExercisePickerCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ExerciseRecency(weeks: Long?) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            Icons.Default.History,
+            contentDescription = null,
+            tint = MuscuColors.TextSecondary,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            exerciseRecencyLabel(weeks),
+            color = MuscuColors.TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

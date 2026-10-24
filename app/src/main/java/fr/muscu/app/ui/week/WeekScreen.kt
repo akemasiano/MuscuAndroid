@@ -91,6 +91,7 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
                     weekStart = state.weekStart,
                     selected = state.selectedDate,
                     daysWithEntries = state.daysWithEntries,
+                    daysWithWeightIncrease = state.daysWithWeightIncrease,
                     today = state.today,
                     onSelect = vm::selectDay,
                 )
@@ -133,6 +134,7 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
         EntrySheet(
             date = request.date,
             exercises = state.exercises,
+            entryHistory = state.entryHistory,
             editing = request.editing,
             initialExerciseId = state.exercises.firstOrNull { it.id !in doneToday }?.id,
             loadLatest = vm::latestFor,
@@ -227,6 +229,7 @@ private fun DayStrip(
     weekStart: LocalDate,
     selected: LocalDate,
     daysWithEntries: Set<LocalDate>,
+    daysWithWeightIncrease: Set<LocalDate>,
     today: LocalDate,
     onSelect: (LocalDate) -> Unit,
 ) {
@@ -260,7 +263,11 @@ private fun DayStrip(
                     color = if (!isSelected && day == today) MuscuColors.Primary else content,
                     modifier = Modifier.padding(vertical = 2.dp),
                 )
-                Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier.fillMaxWidth().height(22.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+                ) {
                     if (day in daysWithEntries) {
                         Box(
                             Modifier
@@ -275,6 +282,9 @@ private fun DayStrip(
                                 modifier = Modifier.size(14.dp),
                             )
                         }
+                    }
+                    if (day in daysWithWeightIncrease) {
+                        WeightIncreaseIcon("Poids augmenté pour au moins un exercice ce jour")
                     }
                 }
             }
@@ -297,7 +307,19 @@ private fun EntryCard(item: DayEntryUi, onClick: () -> Unit) {
         ExerciseAvatar(item.exercise.colorIndex, item.exercise.endImagePath ?: item.exercise.imagePath, 72.dp)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.exercise.name, style = MaterialTheme.typography.titleMedium)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    item.exercise.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (item.hasWeightIncrease) {
+                    WeightIncreaseIcon("Poids augmenté depuis la séance précédente")
+                }
+            }
             Text(
                 item.previous?.let { "Dernière fois : ${it.perf()}" } ?: "Première fois",
                 color = MuscuColors.TextSecondary,
@@ -307,4 +329,14 @@ private fun EntryCard(item: DayEntryUi, onClick: () -> Unit) {
             PerfChip(item.entry.perf())
         }
     }
+
+}
+
+@Composable
+private fun WeightIncreaseIcon(description: String) {
+    Text(
+        "\uD83D\uDCAA",
+        fontSize = 16.sp,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = description },
+    )
 }

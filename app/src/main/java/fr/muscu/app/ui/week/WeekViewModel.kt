@@ -17,18 +17,13 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
-data class DayEntryUi(
-    val entry: WorkoutEntry,
-    val exercise: Exercise,
-    /** Entrée précédente du même exercice (avant celle-ci). */
-    val previous: WorkoutEntry?,
-)
-
 data class WeekUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val daysWithEntries: Set<LocalDate> = emptySet(),
+    val daysWithWeightIncrease: Set<LocalDate> = emptySet(),
     val dayEntries: List<DayEntryUi> = emptyList(),
     val exercises: List<Exercise> = emptyList(),
+    val entryHistory: List<WorkoutEntry> = emptyList(),
     val weeklyStreak: Int = 0,
     val today: LocalDate = LocalDate.now(),
 ) {
@@ -47,11 +42,9 @@ class WeekViewModel(private val repo: MuscuRepository) : ViewModel() {
     }.distinctUntilChanged()
 
     val state = combine(selected, repo.exercises, repo.entries, today) { date, exercises, entries, today ->
-        val exercisesById = exercises.associateBy { it.id }
         val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val range = weekStart.toEpochDay()..weekStart.plusDays(6).toEpochDay()
-        // entries est trié par (epochDay, id) : l'élément précédent est donc la séance précédente.
-        val byExercise = entries.groupBy { it.exerciseId }
+        val weekEntries = weekEntries(entries, exercises, weekStart)
         val day = date.toEpochDay()
 
         WeekUiState(
@@ -60,12 +53,13 @@ class WeekViewModel(private val repo: MuscuRepository) : ViewModel() {
                 .filter { it.epochDay in range }
                 .map { LocalDate.ofEpochDay(it.epochDay) }
                 .toSet(),
-            dayEntries = entries.filter { it.epochDay == day }.mapNotNull { entry ->
-                val exercise = exercisesById[entry.exerciseId] ?: return@mapNotNull null
-                val history = byExercise.getValue(entry.exerciseId)
-                DayEntryUi(entry, exercise, history.getOrNull(history.indexOf(entry) - 1))
-            },
+            daysWithWeightIncrease = weekEntries.asSequence()
+                .filter { it.hasWeightIncrease }
+                .map { LocalDate.ofEpochDay(it.entry.epochDay) }
+                .toSet(),
+            dayEntries = weekEntries.filter { it.entry.epochDay == day },
             exercises = exercises,
+            entryHistory = entries,
             weeklyStreak = weeklyStreak(entries, date, today),
             today = today,
         )
