@@ -21,9 +21,11 @@ class MuscuRepository(
 ) {
     private val exerciseDao = db.exerciseDao()
     private val entryDao = db.entryDao()
+    private val measurementDao = db.measurementDao()
 
     val exercises = exerciseDao.observeAll()
     val entries = entryDao.observeAll()
+    val measurements = measurementDao.observeAll()
 
     suspend fun getExercise(id: Long) = exerciseDao.getById(id)
 
@@ -67,6 +69,20 @@ class MuscuRepository(
     }
 
     suspend fun deleteEntry(id: Long) = entryDao.delete(id)
+
+    // --- Mensurations ---
+
+    suspend fun saveMeasurement(id: Long, date: LocalDate, bicepsCm: Double?, shouldersCm: Double?) {
+        val measurement = Measurement(
+            id = id,
+            epochDay = date.toEpochDay(),
+            bicepsCm = bicepsCm,
+            shouldersCm = shouldersCm,
+        )
+        if (id == 0L) measurementDao.insert(measurement) else measurementDao.update(measurement)
+    }
+
+    suspend fun deleteMeasurement(id: Long) = measurementDao.delete(id)
 
     // --- Images d'exercice (stockées dans le stockage interne de l'app) ---
 

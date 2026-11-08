@@ -12,6 +12,16 @@ private val weightFormat = DecimalFormat("0.##", DecimalFormatSymbols(FR))
 
 fun formatWeight(kg: Double): String = weightFormat.format(kg)
 
+private val cmFormat = DecimalFormat("0.#", DecimalFormatSymbols(FR))
+private val cmDeltaFormat = DecimalFormat("+0.#;-0.#", DecimalFormatSymbols(FR))
+
+/** Mensuration en centimètres, une décimale au plus (ex. « 38,5 »). */
+fun formatCm(cm: Double): String = cmFormat.format(cm)
+
+/** Variation signée en centimètres (« +0,5 », « -1 »), « 0 » si elle est négligeable. */
+fun formatCmDelta(delta: Double): String =
+    if (kotlin.math.abs(delta) < 0.05) "0" else cmDeltaFormat.format(delta)
+
 fun formatPerf(sets: Int, reps: Int, kg: Double) = "$sets×$reps @ ${formatWeight(kg)} kg"
 
 fun WorkoutEntry.perf() = formatPerf(sets, reps, weightKg)

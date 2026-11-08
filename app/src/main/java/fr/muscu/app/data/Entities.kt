@@ -37,3 +37,13 @@ data class WorkoutEntry(
     val weightKg: Double,
     val createdAt: Long = System.currentTimeMillis(),
 )
+
+/** Une prise de mensurations (en cm) à une date donnée ; chaque mesure est facultative. */
+@Entity(tableName = "measurements", indices = [Index("epochDay")])
+data class Measurement(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val bicepsCm: Double? = null,
+    val shouldersCm: Double? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)

@@ -7,10 +7,15 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Exercise::class, WorkoutEntry::class], version = 3, exportSchema = false)
+@Database(
+    entities = [Exercise::class, WorkoutEntry::class, Measurement::class],
+    version = 4,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun entryDao(): WorkoutEntryDao
+    abstract fun measurementDao(): MeasurementDao
 
     companion object {
         private val DEFAULT_EXERCISES = listOf(
@@ -31,6 +36,20 @@ abstract class AppDatabase : RoomDatabase() {
                 }, object : Migration(2, 3) {
                     override fun migrate(db: SupportSQLiteDatabase) {
                         ExerciseCatalog.seed(db)
+                    }
+                }, object : Migration(3, 4) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                            "CREATE TABLE IF NOT EXISTS measurements (" +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                "epochDay INTEGER NOT NULL, " +
+                                "bicepsCm REAL, " +
+                                "shouldersCm REAL, " +
+                                "createdAt INTEGER NOT NULL)"
+                        )
+                        db.execSQL(
+                            "CREATE INDEX IF NOT EXISTS index_measurements_epochDay ON measurements (epochDay)"
+                        )
                     }
                 })
                 .addCallback(object : Callback() {

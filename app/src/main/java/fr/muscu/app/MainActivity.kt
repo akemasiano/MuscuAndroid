@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -25,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import fr.muscu.app.ui.exercises.ExerciseEditScreen
 import fr.muscu.app.ui.exercises.ExercisesScreen
+import fr.muscu.app.ui.measurements.MeasurementsScreen
 import fr.muscu.app.ui.theme.MuscuColors
 import fr.muscu.app.ui.theme.MuscuTheme
 import fr.muscu.app.ui.week.WeekScreen
@@ -32,6 +34,7 @@ import fr.muscu.app.ui.week.WeekScreen
 private object Routes {
     const val WEEK = "week"
     const val EXERCISES = "exercises"
+    const val MEASUREMENTS = "measurements"
     const val EXERCISE_EDIT = "exercise/{id}"
     fun exercise(id: Long = -1) = "exercise/$id"
 }
@@ -49,11 +52,12 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     containerColor = MuscuColors.Background,
                     bottomBar = {
-                        if (route == Routes.WEEK || route == Routes.EXERCISES) {
+                        if (route == Routes.WEEK || route == Routes.EXERCISES || route == Routes.MEASUREMENTS) {
                             NavigationBar(containerColor = MuscuColors.Surface) {
                                 listOf(
                                     Triple(Routes.WEEK, "Semaine", Icons.Outlined.CalendarMonth),
                                     Triple(Routes.EXERCISES, "Exercices", Icons.AutoMirrored.Outlined.FormatListBulleted),
+                                    Triple(Routes.MEASUREMENTS, "Mesures", Icons.Outlined.Straighten),
                                 ).forEach { (dest, label, icon) ->
                                     NavigationBarItem(
                                         selected = route == dest,
@@ -88,6 +92,9 @@ class MainActivity : ComponentActivity() {
                                 onOpenExercise = { nav.navigate(Routes.exercise(it)) },
                                 onNewExercise = { nav.navigate(Routes.exercise()) },
                             )
+                        }
+                        composable(Routes.MEASUREMENTS) {
+                            MeasurementsScreen()
                         }
                         composable(
                             Routes.EXERCISE_EDIT,

@@ -51,3 +51,18 @@ interface WorkoutEntryDao {
     @Query("DELETE FROM workout_entries WHERE exerciseId = :exerciseId")
     suspend fun deleteForExercise(exerciseId: Long)
 }
+
+@Dao
+interface MeasurementDao {
+    @Query("SELECT * FROM measurements ORDER BY epochDay, id")
+    fun observeAll(): Flow<List<Measurement>>
+
+    @Insert
+    suspend fun insert(measurement: Measurement): Long
+
+    @Update
+    suspend fun update(measurement: Measurement)
+
+    @Query("DELETE FROM measurements WHERE id = :id")
+    suspend fun delete(id: Long)
+}

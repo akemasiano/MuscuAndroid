@@ -1,0 +1,1131 @@
+diff --git a/README.md b/README.md
+index 94bd8ac..71109c6 100644
+--- a/README.md
++++ b/README.md
+@@ -9,12 +9,13 @@ Application Android (Kotlin, Jetpack Compose, Room) pour suivre ses séances sem
+ - **Série de semaines** : badge flamme à côté du numéro de semaine, sans progression affichée. Une semaine (lundi → dimanche) est validée avec au moins **3 exercices différents** ; répéter le même exercice ne compte qu'une fois. Le badge indique le nombre de semaines validées consécutives à la semaine consultée. La semaine en cours conserve la série précédente jusqu'au dimanche si elle n'est pas encore validée ; une semaine terminée non validée remet le compteur à zéro. Les entrées datées dans le futur ne comptent pas et le compteur des semaines futures reste à zéro.
+ - **Ajouter à la séance** : choix de l'exercice, séries / répétitions / poids (pas de 0,25 kg, appui prolongé sur + pour augmenter le poids en continu jusqu'au relâchement, saisie libre possible), **pré-remplissage automatique avec la dernière valeur saisie pour cet exercice**. Un appui sur une entrée permet de la modifier ou la supprimer.
+ - **Ancienneté des exercices** : visible dans la liste de choix et sous l'exercice sélectionné avant l'ajout : « Utilisé cette semaine », « Dernière utilisation : la semaine dernière », « Dernière utilisation : il y a N semaines » ou « Jamais utilisé ». Le calcul compare les semaines du lundi au dimanche par rapport à la date de la séance choisie ; les séances postérieures à cette date et l'entrée en cours de modification sont exclues. « Jamais utilisé » signifie donc aucune utilisation dans l'historique retenu à cette date. Le préremplissage des performances reste inchangé.
++- **Mensurations** : onglet « Mesures » pour suivre le **tour de biceps** et le **tour d'épaules** (en cm). Chaque prise de mesures est datée (date modifiable, jamais dans le futur) et peut ne contenir qu'une seule des deux valeurs ; les champs laissés vides ne sont pas enregistrés. Saisie libre ou par pas de 0,5 cm (appui prolongé sur +), avec contrôle des valeurs plausibles (biceps 10–100 cm, épaules 50–250 cm). Pour chaque mesure : dernière valeur, variation depuis la mesure précédente et depuis la toute première, et courbe d'évolution dont l'axe horizontal est proportionnel au temps réel. Si plusieurs saisies ont lieu le même jour, la plus récente est retenue pour la courbe. L'historique permet de modifier ou supprimer une prise de mesures.
+ - **Mes exercices** : bibliothèque avec recherche (insensible aux accents), dernière performance et ancienneté.
+ - **Catalogue intégré** : 20 exercices illustrés prêts à sélectionner, avec 40 images Départ / Fin embarquées dans l'APK et disponibles hors ligne. Les planches fournies sont séparées, leurs titres retirés et les deux phases gardent la même échelle, sans agrandissement.
+ - **Nouvel exercice** : nom, couleur, deux images facultatives **Départ / Fin** depuis la galerie ou l'appareil photo ; remplacement, retrait indépendant et inversion des phases.
+ - **Images** : les deux phases s'affichent côte à côte dans l'édition et la saisie d'une séance, sans recadrage. La liste « Ma semaine » garde sa vignette de **72 × 72 dp**, avec l'image de fin en priorité, puis celle de départ, sinon l'haltère colorée.
+ - **Import optimisé** : orientation corrigée, proportions et transparence conservées, côté le plus long limité à **1 600 pixels**, sans agrandissement. Stockage en JPEG (qualité 90) ou PNG si l'image possède un canal alpha. Les images déjà enregistrées sont conservées comme images de départ, sans recompression.
+-- Données stockées localement (base Room `muscu.db`), aucune connexion requise.
++- Données stockées localement (base Room `muscu.db`, version 4), aucune connexion requise. La mise à jour depuis une version précédente conserve exercices, historique et photos ; la table des mensurations est simplement ajoutée.
+ 
+ ### Exercices illustrés inclus
+ 
+@@ -37,6 +38,7 @@ app/src/main/java/fr/muscu/app/
+ ├── data/        Entités Room, DAO, base, dépôt, formatage
+ ├── ui/week/     Écran « Ma semaine » + feuille « Nouvelle entrée »
+ ├── ui/exercises/ Bibliothèque + création/édition d'exercice
++├── ui/measurements/ Mensurations : synthèse, courbes, historique, saisie
+ ├── ui/theme/    Couleurs et typographie
+ └── MainActivity.kt  Navigation + barre du bas
+ .github/workflows/build-apk.yml  Compilation de l'APK sur GitHub
+diff --git a/app/src/main/java/fr/muscu/app/MainActivity.kt b/app/src/main/java/fr/muscu/app/MainActivity.kt
+index a4ea847..8db2108 100644
+--- a/app/src/main/java/fr/muscu/app/MainActivity.kt
++++ b/app/src/main/java/fr/muscu/app/MainActivity.kt
+@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+ import androidx.compose.material.icons.outlined.CalendarMonth
++import androidx.compose.material.icons.outlined.Straighten
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.NavigationBar
+ import androidx.compose.material3.NavigationBarItem
+@@ -25,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
+ import androidx.navigation.navArgument
+ import fr.muscu.app.ui.exercises.ExerciseEditScreen
+ import fr.muscu.app.ui.exercises.ExercisesScreen
++import fr.muscu.app.ui.measurements.MeasurementsScreen
+ import fr.muscu.app.ui.theme.MuscuColors
+ import fr.muscu.app.ui.theme.MuscuTheme
+ import fr.muscu.app.ui.week.WeekScreen
+@@ -32,6 +34,7 @@ import fr.muscu.app.ui.week.WeekScreen
+ private object Routes {
+     const val WEEK = "week"
+     const val EXERCISES = "exercises"
++    const val MEASUREMENTS = "measurements"
+     const val EXERCISE_EDIT = "exercise/{id}"
+     fun exercise(id: Long = -1) = "exercise/$id"
+ }
+@@ -49,11 +52,12 @@ class MainActivity : ComponentActivity() {
+                 Scaffold(
+                     containerColor = MuscuColors.Background,
+                     bottomBar = {
+-                        if (route == Routes.WEEK || route == Routes.EXERCISES) {
++                        if (route == Routes.WEEK || route == Routes.EXERCISES || route == Routes.MEASUREMENTS) {
+                             NavigationBar(containerColor = MuscuColors.Surface) {
+                                 listOf(
+                                     Triple(Routes.WEEK, "Semaine", Icons.Outlined.CalendarMonth),
+                                     Triple(Routes.EXERCISES, "Exercices", Icons.AutoMirrored.Outlined.FormatListBulleted),
++                                    Triple(Routes.MEASUREMENTS, "Mesures", Icons.Outlined.Straighten),
+                                 ).forEach { (dest, label, icon) ->
+                                     NavigationBarItem(
+                                         selected = route == dest,
+@@ -89,6 +93,9 @@ class MainActivity : ComponentActivity() {
+                                 onNewExercise = { nav.navigate(Routes.exercise()) },
+                             )
+                         }
++                        composable(Routes.MEASUREMENTS) {
++                            MeasurementsScreen()
++                        }
+                         composable(
+                             Routes.EXERCISE_EDIT,
+                             arguments = listOf(navArgument("id") { type = NavType.LongType }),
+diff --git a/app/src/main/java/fr/muscu/app/data/AppDatabase.kt b/app/src/main/java/fr/muscu/app/data/AppDatabase.kt
+index 6432555..d8e2ba1 100644
+--- a/app/src/main/java/fr/muscu/app/data/AppDatabase.kt
++++ b/app/src/main/java/fr/muscu/app/data/AppDatabase.kt
+@@ -7,10 +7,15 @@ import androidx.room.RoomDatabase
+ import androidx.room.migration.Migration
+ import androidx.sqlite.db.SupportSQLiteDatabase
+ 
+-@Database(entities = [Exercise::class, WorkoutEntry::class], version = 3, exportSchema = false)
++@Database(
++    entities = [Exercise::class, WorkoutEntry::class, Measurement::class],
++    version = 4,
++    exportSchema = false,
++)
+ abstract class AppDatabase : RoomDatabase() {
+     abstract fun exerciseDao(): ExerciseDao
+     abstract fun entryDao(): WorkoutEntryDao
++    abstract fun measurementDao(): MeasurementDao
+ 
+     companion object {
+         private val DEFAULT_EXERCISES = listOf(
+@@ -32,6 +37,20 @@ abstract class AppDatabase : RoomDatabase() {
+                     override fun migrate(db: SupportSQLiteDatabase) {
+                         ExerciseCatalog.seed(db)
+                     }
++                }, object : Migration(3, 4) {
++                    override fun migrate(db: SupportSQLiteDatabase) {
++                        db.execSQL(
++                            "CREATE TABLE IF NOT EXISTS measurements (" +
++                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
++                                "epochDay INTEGER NOT NULL, " +
++                                "bicepsCm REAL, " +
++                                "shouldersCm REAL, " +
++                                "createdAt INTEGER NOT NULL)"
++                        )
++                        db.execSQL(
++                            "CREATE INDEX IF NOT EXISTS index_measurements_epochDay ON measurements (epochDay)"
++                        )
++                    }
+                 })
+                 .addCallback(object : Callback() {
+                     override fun onCreate(db: SupportSQLiteDatabase) {
+diff --git a/app/src/main/java/fr/muscu/app/data/Daos.kt b/app/src/main/java/fr/muscu/app/data/Daos.kt
+index 29298f5..06e6164 100644
+--- a/app/src/main/java/fr/muscu/app/data/Daos.kt
++++ b/app/src/main/java/fr/muscu/app/data/Daos.kt
+@@ -51,3 +51,18 @@ interface WorkoutEntryDao {
+     @Query("DELETE FROM workout_entries WHERE exerciseId = :exerciseId")
+     suspend fun deleteForExercise(exerciseId: Long)
+ }
++
++@Dao
++interface MeasurementDao {
++    @Query("SELECT * FROM measurements ORDER BY epochDay, id")
++    fun observeAll(): Flow<List<Measurement>>
++
++    @Insert
++    suspend fun insert(measurement: Measurement): Long
++
++    @Update
++    suspend fun update(measurement: Measurement)
++
++    @Query("DELETE FROM measurements WHERE id = :id")
++    suspend fun delete(id: Long)
++}
+diff --git a/app/src/main/java/fr/muscu/app/data/Entities.kt b/app/src/main/java/fr/muscu/app/data/Entities.kt
+index 92d5885..de70cfc 100644
+--- a/app/src/main/java/fr/muscu/app/data/Entities.kt
++++ b/app/src/main/java/fr/muscu/app/data/Entities.kt
+@@ -37,3 +37,13 @@ data class WorkoutEntry(
+     val weightKg: Double,
+     val createdAt: Long = System.currentTimeMillis(),
+ )
++
++/** Une prise de mensurations (en cm) à une date donnée ; chaque mesure est facultative. */
++@Entity(tableName = "measurements", indices = [Index("epochDay")])
++data class Measurement(
++    @PrimaryKey(autoGenerate = true) val id: Long = 0,
++    val epochDay: Long,
++    val bicepsCm: Double? = null,
++    val shouldersCm: Double? = null,
++    val createdAt: Long = System.currentTimeMillis(),
++)
+diff --git a/app/src/main/java/fr/muscu/app/data/Format.kt b/app/src/main/java/fr/muscu/app/data/Format.kt
+index 157f546..6f72d55 100644
+--- a/app/src/main/java/fr/muscu/app/data/Format.kt
++++ b/app/src/main/java/fr/muscu/app/data/Format.kt
+@@ -12,6 +12,16 @@ private val weightFormat = DecimalFormat("0.##", DecimalFormatSymbols(FR))
+ 
+ fun formatWeight(kg: Double): String = weightFormat.format(kg)
+ 
++private val cmFormat = DecimalFormat("0.#", DecimalFormatSymbols(FR))
++private val cmDeltaFormat = DecimalFormat("+0.#;-0.#", DecimalFormatSymbols(FR))
++
++/** Mensuration en centimètres, une décimale au plus (ex. « 38,5 »). */
++fun formatCm(cm: Double): String = cmFormat.format(cm)
++
++/** Variation signée en centimètres (« +0,5 », « -1 »), « 0 » si elle est négligeable. */
++fun formatCmDelta(delta: Double): String =
++    if (kotlin.math.abs(delta) < 0.05) "0" else cmDeltaFormat.format(delta)
++
+ fun formatPerf(sets: Int, reps: Int, kg: Double) = "$sets×$reps @ ${formatWeight(kg)} kg"
+ 
+ fun WorkoutEntry.perf() = formatPerf(sets, reps, weightKg)
+diff --git a/app/src/main/java/fr/muscu/app/data/MuscuRepository.kt b/app/src/main/java/fr/muscu/app/data/MuscuRepository.kt
+index e5f4b35..b9fbd1d 100644
+--- a/app/src/main/java/fr/muscu/app/data/MuscuRepository.kt
++++ b/app/src/main/java/fr/muscu/app/data/MuscuRepository.kt
+@@ -21,9 +21,11 @@ class MuscuRepository(
+ ) {
+     private val exerciseDao = db.exerciseDao()
+     private val entryDao = db.entryDao()
++    private val measurementDao = db.measurementDao()
+ 
+     val exercises = exerciseDao.observeAll()
+     val entries = entryDao.observeAll()
++    val measurements = measurementDao.observeAll()
+ 
+     suspend fun getExercise(id: Long) = exerciseDao.getById(id)
+ 
+@@ -68,6 +70,20 @@ class MuscuRepository(
+ 
+     suspend fun deleteEntry(id: Long) = entryDao.delete(id)
+ 
++    // --- Mensurations ---
++
++    suspend fun saveMeasurement(id: Long, date: LocalDate, bicepsCm: Double?, shouldersCm: Double?) {
++        val measurement = Measurement(
++            id = id,
++            epochDay = date.toEpochDay(),
++            bicepsCm = bicepsCm,
++            shouldersCm = shouldersCm,
++        )
++        if (id == 0L) measurementDao.insert(measurement) else measurementDao.update(measurement)
++    }
++
++    suspend fun deleteMeasurement(id: Long) = measurementDao.delete(id)
++
+     // --- Images d'exercice (stockées dans le stockage interne de l'app) ---
+ 
+     private val imagesDir: File
+diff --git a/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementProgress.kt b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementProgress.kt
+new file mode 100644
+index 0000000..1d6e30f
+--- /dev/null
++++ b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementProgress.kt
+@@ -0,0 +1,82 @@
++package fr.muscu.app.ui.measurements
++
++import fr.muscu.app.data.Measurement
++import fr.muscu.app.data.parseWeight
++import kotlin.math.ceil
++import kotlin.math.floor
++import kotlin.math.roundToLong
++
++/** Les deux mensurations suivies, avec la plage de valeurs jugée plausible pour détecter les fautes de frappe. */
++enum class MeasureType(
++    val label: String,
++    val min: Double,
++    val max: Double,
++    /** Valeur proposée au premier appui sur « + » quand aucune mesure n'existe encore. */
++    val startValue: Double,
++) {
++    BICEPS("Tour de biceps", min = 10.0, max = 100.0, startValue = 35.0),
++    SHOULDERS("Tour d’épaules", min = 50.0, max = 250.0, startValue = 110.0);
++
++    fun valueOf(measurement: Measurement): Double? = when (this) {
++        BICEPS -> measurement.bicepsCm
++        SHOULDERS -> measurement.shouldersCm
++    }
++}
++
++data class MeasurePoint(val epochDay: Long, val cm: Double)
++
++data class MeasureProgress(
++    val type: MeasureType,
++    /** Une valeur par jour, du plus ancien au plus récent. */
++    val points: List<MeasurePoint>,
++) {
++    val first: MeasurePoint? get() = points.firstOrNull()
++    val latest: MeasurePoint? get() = points.lastOrNull()
++
++    /** Variation entre la dernière mesure et la précédente (null s'il n'y a qu'une mesure). */
++    val deltaFromPrevious: Double?
++        get() = if (points.size >= 2) round1(points.last().cm - points[points.size - 2].cm) else null
++
++    /** Variation entre la dernière mesure et la toute première (null s'il n'y a qu'une mesure). */
++    val deltaFromFirst: Double?
++        get() = if (points.size >= 2) round1(points.last().cm - points.first().cm) else null
++}
++
++internal fun round1(value: Double): Double = (value * 10).roundToLong() / 10.0
++
++/**
++ * Série chronologique d'une mensuration. Les mesures sans valeur pour ce type sont ignorées ;
++ * si plusieurs saisies tombent le même jour, la dernière créée l'emporte.
++ */
++internal fun measurePoints(measurements: List<Measurement>, type: MeasureType): List<MeasurePoint> {
++    val byDay = LinkedHashMap<Long, Double>()
++    measurements
++        .sortedWith(compareBy<Measurement> { it.epochDay }.thenBy { it.id })
++        .forEach { m -> type.valueOf(m)?.let { byDay[m.epochDay] = it } }
++    return byDay.map { (day, cm) -> MeasurePoint(day, cm) }
++}
++
++internal fun measureProgress(measurements: List<Measurement>, type: MeasureType) =
++    MeasureProgress(type, measurePoints(measurements, type))
++
++/** Bornes verticales du graphique : les données plus une marge, arrondies à l'entier. Toujours min < max. */
++internal fun chartBounds(points: List<MeasurePoint>): Pair<Double, Double> {
++    if (points.isEmpty()) return 0.0 to 1.0
++    val min = points.minOf { it.cm }
++    val max = points.maxOf { it.cm }
++    val margin = maxOf(0.5, (max - min) * 0.15)
++    return floor(min - margin) to ceil(max + margin)
++}
++
++internal sealed interface MeasureInput {
++    /** Champ laissé vide : cette mesure n'est pas enregistrée. */
++    data object Empty : MeasureInput
++    data class Valid(val cm: Double) : MeasureInput
++    data object Invalid : MeasureInput
++}
++
++internal fun parseMeasure(text: String, type: MeasureType): MeasureInput {
++    if (text.isBlank()) return MeasureInput.Empty
++    val value = parseWeight(text) ?: return MeasureInput.Invalid
++    return if (value in type.min..type.max) MeasureInput.Valid(round1(value)) else MeasureInput.Invalid
++}
+diff --git a/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt
+new file mode 100644
+index 0000000..e1855ff
+--- /dev/null
++++ b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt
+@@ -0,0 +1,532 @@
++package fr.muscu.app.ui.measurements
++
++import androidx.compose.foundation.Canvas
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.ExperimentalLayoutApi
++import androidx.compose.foundation.layout.FlowRow
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxHeight
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.BasicTextField
++import androidx.compose.foundation.text.KeyboardOptions
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.ChevronLeft
++import androidx.compose.material.icons.filled.ChevronRight
++import androidx.compose.material.icons.filled.Remove
++import androidx.compose.material3.BottomSheetDefaults
++import androidx.compose.material3.DatePicker
++import androidx.compose.material3.DatePickerDialog
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.ModalBottomSheet
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.material3.rememberDatePickerState
++import androidx.compose.material3.rememberModalBottomSheetState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.Path
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.graphics.drawscope.Stroke
++import androidx.compose.ui.semantics.clearAndSetSemantics
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.text.TextStyle
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import fr.muscu.app.data.FR
++import fr.muscu.app.data.Measurement
++import fr.muscu.app.data.formatCm
++import fr.muscu.app.data.formatCmDelta
++import fr.muscu.app.data.relativeDay
++import fr.muscu.app.ui.components.CircleIconButton
++import fr.muscu.app.ui.components.ExtendedPrimaryFab
++import fr.muscu.app.ui.components.PerfChip
++import fr.muscu.app.ui.components.PrimaryButton
++import fr.muscu.app.ui.components.SectionLabel
++import fr.muscu.app.ui.muscuViewModel
++import fr.muscu.app.ui.theme.MuscuColors
++import kotlinx.coroutines.launch
++import java.time.Instant
++import java.time.LocalDate
++import java.time.ZoneOffset
++import java.time.format.DateTimeFormatter
++import kotlin.math.abs
++
++private const val STEP_CM = 0.5
++
++private val shortDate = DateTimeFormatter.ofPattern("d MMM yyyy", FR)
++private val longDate = DateTimeFormatter.ofPattern("d MMMM yyyy", FR)
++
++private fun dayLabel(epochDay: Long): String = LocalDate.ofEpochDay(epochDay).format(shortDate)
++
++/** `editing == null` : nouvelle prise de mensurations. */
++private data class SheetRequest(val editing: Measurement?)
++
++@Composable
++fun MeasurementsScreen() {
++    val vm = muscuViewModel { MeasurementsViewModel(it) }
++    val state by vm.state.collectAsStateWithLifecycle()
++    var sheet by remember { mutableStateOf<SheetRequest?>(null) }
++
++    Box(Modifier.fillMaxSize()) {
++        LazyColumn(
++            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 110.dp),
++            verticalArrangement = Arrangement.spacedBy(12.dp),
++        ) {
++            item {
++                Column {
++                    SectionLabel("Suivi")
++                    Text("Mensurations", style = MaterialTheme.typography.headlineLarge)
++                }
++            }
++            item { ProgressCard(state.biceps, MuscuColors.Primary) }
++            item { ProgressCard(state.shoulders, MuscuColors.gradient(5).first) }
++            item { SectionLabel("Historique", Modifier.padding(top = 12.dp, bottom = 4.dp)) }
++            if (state.history.isEmpty()) {
++                item {
++                    Text(
++                        "Aucune mesure enregistrée.\nAppuie sur « Ajouter » pour noter ton tour de biceps et d’épaules.",
++                        color = MuscuColors.TextSecondary,
++                        textAlign = TextAlign.Center,
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .padding(vertical = 24.dp),
++                    )
++                }
++            }
++            items(state.history, key = { it.id }) { measurement ->
++                HistoryCard(measurement) { sheet = SheetRequest(measurement) }
++            }
++        }
++
++        ExtendedPrimaryFab(
++            text = "Ajouter",
++            icon = Icons.Default.Add,
++            onClick = { sheet = SheetRequest(null) },
++            modifier = Modifier
++                .align(Alignment.BottomEnd)
++                .padding(20.dp),
++        )
++    }
++
++    sheet?.let { request ->
++        MeasurementSheet(
++            editing = request.editing,
++            latestBiceps = state.biceps.latest?.cm,
++            latestShoulders = state.shoulders.latest?.cm,
++            onDismiss = { sheet = null },
++            onSave = { date, biceps, shoulders ->
++                vm.save(request.editing?.id ?: 0, date, biceps, shoulders)
++            },
++            onDelete = request.editing?.let { m -> { vm.delete(m.id) } },
++        )
++    }
++}
++
++// --- Cartes de synthèse et graphique ---
++
++@OptIn(ExperimentalLayoutApi::class)
++@Composable
++private fun ProgressCard(progress: MeasureProgress, color: Color) {
++    val latest = progress.latest
++    Column(
++        Modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(20.dp))
++            .background(MuscuColors.Surface)
++            .border(1.dp, MuscuColors.Border, RoundedCornerShape(20.dp))
++            .padding(16.dp),
++        verticalArrangement = Arrangement.spacedBy(10.dp),
++    ) {
++        Row(verticalAlignment = Alignment.CenterVertically) {
++            Text(progress.type.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
++            if (latest != null) {
++                Text(
++                    relativeDay(latest.epochDay),
++                    color = MuscuColors.TextSecondary,
++                    style = MaterialTheme.typography.bodyMedium,
++                )
++            }
++        }
++
++        if (latest == null) {
++            Text("Aucune mesure pour l’instant", color = MuscuColors.TextSecondary)
++            return@Column
++        }
++
++        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
++            Text(formatCm(latest.cm), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = color)
++            Text("cm", color = MuscuColors.TextSecondary, modifier = Modifier.padding(bottom = 7.dp))
++        }
++
++        val firstDay = progress.points.first().epochDay
++        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++            progress.deltaFromPrevious?.let { delta ->
++                // Avec deux mesures seulement, « depuis la précédente » et « depuis le début » sont identiques.
++                val label = if (progress.points.size == 2) "depuis le ${dayLabel(firstDay)}" else "depuis la dernière mesure"
++                DeltaChip(delta, label)
++            }
++            if (progress.points.size >= 3) {
++                progress.deltaFromFirst?.let { delta -> DeltaChip(delta, "depuis le ${dayLabel(firstDay)}") }
++            }
++        }
++
++        if (progress.points.size >= 2) {
++            MeasureChart(
++                points = progress.points,
++                color = color,
++                description = "Évolution de ${formatCm(progress.points.first().cm)} cm à " +
++                    "${formatCm(latest.cm)} cm entre le ${dayLabel(firstDay)} et le ${dayLabel(latest.epochDay)}",
++            )
++        } else {
++            Text(
++                "Ajoute une deuxième mesure pour voir la courbe d’évolution.",
++                color = MuscuColors.TextSecondary,
++                style = MaterialTheme.typography.bodyMedium,
++            )
++        }
++    }
++}
++
++@Composable
++private fun DeltaChip(delta: Double, label: String) {
++    val (background, content) = when {
++        abs(delta) < 0.05 -> MuscuColors.Border to MuscuColors.TextSecondary
++        delta > 0 -> MuscuColors.PrimaryLight to MuscuColors.Primary
++        else -> MuscuColors.StreakLight to MuscuColors.StreakText
++    }
++    Text(
++        "${formatCmDelta(delta)} cm $label",
++        modifier = Modifier
++            .clip(RoundedCornerShape(8.dp))
++            .background(background)
++            .padding(horizontal = 10.dp, vertical = 5.dp),
++        color = content,
++        fontWeight = FontWeight.SemiBold,
++        style = MaterialTheme.typography.bodyMedium,
++    )
++}
++
++/** Courbe simple : l'axe horizontal est proportionnel au temps réel entre les mesures. */
++@Composable
++private fun MeasureChart(points: List<MeasurePoint>, color: Color, description: String) {
++    val (low, high) = remember(points) { chartBounds(points) }
++    val firstDay = points.first().epochDay
++    val lastDay = points.last().epochDay
++    val gridColor = MuscuColors.Border
++
++    Column(Modifier.fillMaxWidth()) {
++        Row(Modifier.fillMaxWidth().height(140.dp)) {
++            Column(
++                Modifier.width(40.dp).fillMaxHeight(),
++                verticalArrangement = Arrangement.SpaceBetween,
++            ) {
++                Text(formatCm(high), color = MuscuColors.TextSecondary, fontSize = 12.sp)
++                Text(formatCm(low), color = MuscuColors.TextSecondary, fontSize = 12.sp)
++            }
++            Canvas(
++                Modifier
++                    .weight(1f)
++                    .fillMaxHeight()
++                    .clearAndSetSemantics { contentDescription = description },
++            ) {
++                val w = size.width
++                val h = size.height
++                val padX = 8.dp.toPx()
++                val span = (lastDay - firstDay).coerceAtLeast(1L).toFloat()
++                val xOf = { day: Long -> padX + (w - 2 * padX) * (day - firstDay).toFloat() / span }
++                val yOf = { cm: Double -> h * (1f - ((cm - low) / (high - low)).toFloat()) }
++
++                listOf(0f, h / 2, h).forEach { y ->
++                    drawLine(gridColor, Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
++                }
++
++                val line = Path()
++                val area = Path()
++                points.forEachIndexed { i, p ->
++                    val x = xOf(p.epochDay)
++                    val y = yOf(p.cm)
++                    if (i == 0) {
++                        line.moveTo(x, y)
++                        area.moveTo(x, h)
++                        area.lineTo(x, y)
++                    } else {
++                        line.lineTo(x, y)
++                        area.lineTo(x, y)
++                    }
++                }
++                area.lineTo(xOf(lastDay), h)
++                area.close()
++
++                drawPath(area, color.copy(alpha = 0.12f))
++                drawPath(
++                    line,
++                    color,
++                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
++                )
++                points.forEachIndexed { i, p ->
++                    val isLast = i == points.lastIndex
++                    if (!isLast && points.size > 40) return@forEachIndexed
++                    val center = Offset(xOf(p.epochDay), yOf(p.cm))
++                    if (isLast) drawCircle(Color.White, 7.dp.toPx(), center)
++                    drawCircle(color, if (isLast) 5.dp.toPx() else 3.dp.toPx(), center)
++                }
++            }
++        }
++        Row(
++            Modifier.fillMaxWidth().padding(start = 40.dp, top = 4.dp),
++            horizontalArrangement = Arrangement.SpaceBetween,
++        ) {
++            Text(dayLabel(firstDay), color = MuscuColors.TextSecondary, fontSize = 12.sp)
++            Text(dayLabel(lastDay), color = MuscuColors.TextSecondary, fontSize = 12.sp)
++        }
++    }
++}
++
++// --- Historique ---
++
++@OptIn(ExperimentalLayoutApi::class)
++@Composable
++private fun HistoryCard(measurement: Measurement, onClick: () -> Unit) {
++    Column(
++        Modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(18.dp))
++            .background(MuscuColors.Surface)
++            .border(1.dp, MuscuColors.Border, RoundedCornerShape(18.dp))
++            .clickable(onClick = onClick)
++            .padding(16.dp),
++        verticalArrangement = Arrangement.spacedBy(8.dp),
++    ) {
++        Text(
++            LocalDate.ofEpochDay(measurement.epochDay).format(longDate),
++            style = MaterialTheme.typography.titleMedium,
++        )
++        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++            measurement.bicepsCm?.let { PerfChip("Biceps ${formatCm(it)} cm") }
++            measurement.shouldersCm?.let { PerfChip("Épaules ${formatCm(it)} cm") }
++        }
++    }
++}
++
++// --- Saisie ---
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++private fun MeasurementSheet(
++    editing: Measurement?,
++    latestBiceps: Double?,
++    latestShoulders: Double?,
++    onDismiss: () -> Unit,
++    onSave: (date: LocalDate, biceps: Double?, shoulders: Double?) -> Unit,
++    onDelete: (() -> Unit)?,
++) {
++    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
++    val scope = rememberCoroutineScope()
++    fun closeThen(action: () -> Unit) {
++        scope.launch { sheetState.hide() }.invokeOnCompletion {
++            action()
++            onDismiss()
++        }
++    }
++
++    var date by remember { mutableStateOf(editing?.let { LocalDate.ofEpochDay(it.epochDay) } ?: LocalDate.now()) }
++    var bicepsText by remember { mutableStateOf(editing?.bicepsCm?.let { formatCm(it) } ?: "") }
++    var shouldersText by remember { mutableStateOf(editing?.shouldersCm?.let { formatCm(it) } ?: "") }
++    var showPicker by remember { mutableStateOf(false) }
++
++    val biceps = parseMeasure(bicepsText, MeasureType.BICEPS)
++    val shoulders = parseMeasure(shouldersText, MeasureType.SHOULDERS)
++    val canSave = biceps !is MeasureInput.Invalid &&
++        shoulders !is MeasureInput.Invalid &&
++        (biceps is MeasureInput.Valid || shoulders is MeasureInput.Valid)
++
++    ModalBottomSheet(
++        onDismissRequest = onDismiss,
++        sheetState = sheetState,
++        containerColor = MuscuColors.Background,
++        dragHandle = { BottomSheetDefaults.DragHandle(color = MuscuColors.Border) },
++    ) {
++        Column(
++            Modifier
++                .verticalScroll(rememberScrollState())
++                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
++            verticalArrangement = Arrangement.spacedBy(12.dp),
++        ) {
++            Text(
++                if (editing == null) "Nouvelle mesure" else "Modifier la mesure",
++                style = MaterialTheme.typography.titleLarge,
++            )
++
++            DateRow(date = date, onChange = { date = it }, onPick = { showPicker = true })
++
++            MeasureField(MeasureType.BICEPS, bicepsText, { bicepsText = it }, latestBiceps)
++            MeasureField(MeasureType.SHOULDERS, shouldersText, { shouldersText = it }, latestShoulders)
++
++            PrimaryButton(
++                text = "Enregistrer",
++                enabled = canSave,
++                onClick = {
++                    closeThen {
++                        onSave(
++                            date,
++                            (biceps as? MeasureInput.Valid)?.cm,
++                            (shoulders as? MeasureInput.Valid)?.cm,
++                        )
++                    }
++                },
++            )
++
++            if (onDelete != null) {
++                TextButton(
++                    onClick = { closeThen(onDelete) },
++                    modifier = Modifier.align(Alignment.CenterHorizontally),
++                ) { Text("Supprimer cette mesure", color = MuscuColors.Danger) }
++            }
++        }
++    }
++
++    if (showPicker) {
++        val pickerState = rememberDatePickerState(
++            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
++        )
++        DatePickerDialog(
++            onDismissRequest = { showPicker = false },
++            confirmButton = {
++                TextButton(onClick = {
++                    pickerState.selectedDateMillis?.let { millis ->
++                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
++                        // Une mensuration ne peut pas être datée dans le futur.
++                        date = minOf(picked, LocalDate.now())
++                    }
++                    showPicker = false
++                }) { Text("OK", color = MuscuColors.Primary) }
++            },
++            dismissButton = {
++                TextButton(onClick = { showPicker = false }) { Text("Annuler", color = MuscuColors.Primary) }
++            },
++        ) {
++            DatePicker(state = pickerState)
++        }
++    }
++}
++
++@Composable
++private fun DateRow(date: LocalDate, onChange: (LocalDate) -> Unit, onPick: () -> Unit) {
++    Row(
++        Modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(16.dp))
++            .background(MuscuColors.Surface)
++            .border(1.dp, MuscuColors.Border, RoundedCornerShape(16.dp))
++            .padding(horizontal = 16.dp, vertical = 10.dp),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        Text("Date", color = MuscuColors.TextSecondary, modifier = Modifier.weight(1f))
++        CircleIconButton(Icons.Default.ChevronLeft, "Jour précédent", { onChange(date.minusDays(1)) }, size = 42.dp)
++        Text(
++            date.format(shortDate),
++            fontSize = 18.sp,
++            fontWeight = FontWeight.SemiBold,
++            textAlign = TextAlign.Center,
++            modifier = Modifier
++                .width(130.dp)
++                .clickable(onClick = onPick)
++                .padding(vertical = 8.dp),
++        )
++        CircleIconButton(
++            Icons.Default.ChevronRight, "Jour suivant", { onChange(date.plusDays(1)) },
++            size = 42.dp,
++            enabled = date < LocalDate.now(),
++        )
++    }
++}
++
++@Composable
++private fun MeasureField(type: MeasureType, text: String, onTextChange: (String) -> Unit, last: Double?) {
++    val input = parseMeasure(text, type)
++
++    // Champ vide : le premier appui reprend la dernière mesure connue, les suivants varient de 0,5 cm.
++    fun step(delta: Double) {
++        val current = (input as? MeasureInput.Valid)?.cm
++        val next = if (current == null) last ?: type.startValue else current + delta
++        onTextChange(formatCm(round1(next.coerceIn(type.min, type.max))))
++    }
++
++    Column(
++        Modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(16.dp))
++            .background(MuscuColors.Surface)
++            .border(1.dp, MuscuColors.Border, RoundedCornerShape(16.dp))
++            .padding(horizontal = 16.dp, vertical = 10.dp),
++    ) {
++        Row(verticalAlignment = Alignment.CenterVertically) {
++            Text(type.label, color = MuscuColors.TextSecondary, modifier = Modifier.weight(1f))
++            CircleIconButton(Icons.Default.Remove, "Moins", { step(-STEP_CM) }, size = 42.dp)
++            Box(Modifier.width(100.dp), contentAlignment = Alignment.Center) {
++                if (text.isEmpty()) {
++                    Text("—", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = MuscuColors.TextSecondary)
++                }
++                BasicTextField(
++                    value = text,
++                    onValueChange = { new ->
++                        if (new.length <= 5 && new.all { it.isDigit() || it == ',' || it == '.' }) onTextChange(new)
++                    },
++                    singleLine = true,
++                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
++                    textStyle = TextStyle(
++                        fontSize = 24.sp,
++                        fontWeight = FontWeight.SemiBold,
++                        textAlign = TextAlign.Center,
++                        color = if (input is MeasureInput.Invalid) MuscuColors.Danger else MuscuColors.Text,
++                    ),
++                    cursorBrush = SolidColor(MuscuColors.Primary),
++                    modifier = Modifier.fillMaxWidth(),
++                )
++            }
++            CircleIconButton(Icons.Default.Add, "Plus", { step(STEP_CM) }, size = 42.dp, repeatOnHold = true)
++        }
++        Text(
++            when {
++                input is MeasureInput.Invalid ->
++                    "Valeur attendue entre ${type.min.toInt()} et ${type.max.toInt()} cm"
++                last != null -> "Dernière mesure : ${formatCm(last)} cm"
++                else -> "Facultatif"
++            },
++            color = if (input is MeasureInput.Invalid) MuscuColors.Danger else MuscuColors.TextSecondary,
++            style = MaterialTheme.typography.bodyMedium,
++        )
++    }
++}
+diff --git a/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsViewModel.kt b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsViewModel.kt
+new file mode 100644
+index 0000000..9a81fe4
+--- /dev/null
++++ b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsViewModel.kt
+@@ -0,0 +1,39 @@
++package fr.muscu.app.ui.measurements
++
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import fr.muscu.app.data.Measurement
++import fr.muscu.app.data.MuscuRepository
++import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.map
++import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.launch
++import java.time.LocalDate
++
++data class MeasurementsUiState(
++    /** Toutes les prises de mensurations, de la plus récente à la plus ancienne. */
++    val history: List<Measurement> = emptyList(),
++    val biceps: MeasureProgress = MeasureProgress(MeasureType.BICEPS, emptyList()),
++    val shoulders: MeasureProgress = MeasureProgress(MeasureType.SHOULDERS, emptyList()),
++)
++
++class MeasurementsViewModel(private val repo: MuscuRepository) : ViewModel() {
++
++    val state = repo.measurements.map { all ->
++        MeasurementsUiState(
++            history = all.sortedWith(
++                compareByDescending<Measurement> { it.epochDay }.thenByDescending { it.id }
++            ),
++            biceps = measureProgress(all, MeasureType.BICEPS),
++            shoulders = measureProgress(all, MeasureType.SHOULDERS),
++        )
++    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MeasurementsUiState())
++
++    fun save(id: Long, date: LocalDate, bicepsCm: Double?, shouldersCm: Double?) {
++        viewModelScope.launch { repo.saveMeasurement(id, date, bicepsCm, shouldersCm) }
++    }
++
++    fun delete(id: Long) {
++        viewModelScope.launch { repo.deleteMeasurement(id) }
++    }
++}
+diff --git a/app/src/test/java/fr/muscu/app/data/FormatCmTest.kt b/app/src/test/java/fr/muscu/app/data/FormatCmTest.kt
+new file mode 100644
+index 0000000..aee048c
+--- /dev/null
++++ b/app/src/test/java/fr/muscu/app/data/FormatCmTest.kt
+@@ -0,0 +1,26 @@
++package fr.muscu.app.data
++
++import org.junit.Assert.assertEquals
++import org.junit.Test
++
++class FormatCmTest {
++    @Test
++    fun centimetresUseAFrenchDecimalCommaAndAtMostOneDecimal() {
++        assertEquals("38,5", formatCm(38.5))
++        assertEquals("38", formatCm(38.0))
++        assertEquals("38", formatCm(38.04))
++        assertEquals("112", formatCm(112.0))
++    }
++
++    @Test
++    fun deltasAreSignedAndNegligibleOnesShowZero() {
++        assertEquals("+0,5", formatCmDelta(0.5))
++        assertEquals("+2", formatCmDelta(2.0))
++        assertEquals("0", formatCmDelta(0.0))
++        assertEquals("0", formatCmDelta(0.01))
++        assertEquals("0", formatCmDelta(-0.04))
++        // Selon le JDK, le signe moins peut être un tiret ou un vrai signe moins typographique.
++        assertEquals("-1", formatCmDelta(-1.0).replace('−', '-'))
++        assertEquals("-1,5", formatCmDelta(-1.5).replace('−', '-'))
++    }
++}
+diff --git a/app/src/test/java/fr/muscu/app/data/MeasurementRepositoryTest.kt b/app/src/test/java/fr/muscu/app/data/MeasurementRepositoryTest.kt
+new file mode 100644
+index 0000000..009c6cd
+--- /dev/null
++++ b/app/src/test/java/fr/muscu/app/data/MeasurementRepositoryTest.kt
+@@ -0,0 +1,83 @@
++package fr.muscu.app.data
++
++import android.content.Context
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.runBlocking
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.annotation.Config
++import java.time.LocalDate
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34])
++class MeasurementRepositoryTest {
++    private lateinit var context: Context
++    private lateinit var db: AppDatabase
++
++    @Before
++    fun setUp() {
++        context = RuntimeEnvironment.getApplication()
++        db = AppDatabase.create(context)
++    }
++
++    @After
++    fun tearDown() {
++        db.close()
++        context.deleteDatabase("muscu.db")
++    }
++
++    @Test
++    fun freshInstallStartsWithoutMeasurements() = runBlocking {
++        assertTrue(MuscuRepository(context, db).measurements.first().isEmpty())
++    }
++
++    @Test
++    fun measurementsCanBeAddedEditedAndDeleted() = runBlocking {
++        val repo = MuscuRepository(context, db)
++        val day = LocalDate.of(2026, 11, 1)
++
++        repo.saveMeasurement(0, day, bicepsCm = 38.5, shouldersCm = null)
++        repo.saveMeasurement(0, day.plusDays(7), bicepsCm = null, shouldersCm = 112.0)
++        val saved = repo.measurements.first()
++        assertEquals(listOf(day.toEpochDay(), day.plusDays(7).toEpochDay()), saved.map { it.epochDay })
++        assertEquals(38.5, requireNotNull(saved[0].bicepsCm), 0.0)
++        assertNull(saved[0].shouldersCm)
++        assertNull(saved[1].bicepsCm)
++
++        repo.saveMeasurement(saved[0].id, day, bicepsCm = 39.0, shouldersCm = 110.5)
++        val edited = repo.measurements.first()
++        assertEquals(2, edited.size)
++        assertEquals(39.0, requireNotNull(edited[0].bicepsCm), 0.0)
++        assertEquals(110.5, requireNotNull(edited[0].shouldersCm), 0.0)
++
++        repo.deleteMeasurement(saved[1].id)
++        assertEquals(listOf(saved[0].id), repo.measurements.first().map { it.id })
++    }
++
++    @Test
++    fun versionThreeMigrationCreatesTheTableAndKeepsExistingData() = runBlocking {
++        val repo = MuscuRepository(context, db)
++        val exerciseId = repo.exercises.first().first().id
++        repo.saveEntry(0, exerciseId, LocalDate.of(2026, 10, 1), 3, 10, 20.0)
++
++        // Simule une base créée avant l'ajout des mensurations.
++        val sqlite = db.openHelper.writableDatabase
++        sqlite.execSQL("DROP TABLE measurements")
++        sqlite.version = 3
++        db.close()
++        db = AppDatabase.create(context)
++
++        val migrated = MuscuRepository(context, db)
++        assertEquals(20.0, requireNotNull(migrated.latestEntryFor(exerciseId)).weightKg, 0.0)
++        assertTrue(migrated.measurements.first().isEmpty())
++        migrated.saveMeasurement(0, LocalDate.of(2026, 11, 8), bicepsCm = 38.0, shouldersCm = 111.0)
++        assertEquals(1, migrated.measurements.first().size)
++    }
++}
+diff --git a/app/src/test/java/fr/muscu/app/ui/measurements/MeasurementProgressTest.kt b/app/src/test/java/fr/muscu/app/ui/measurements/MeasurementProgressTest.kt
+new file mode 100644
+index 0000000..61c5bd3
+--- /dev/null
++++ b/app/src/test/java/fr/muscu/app/ui/measurements/MeasurementProgressTest.kt
+@@ -0,0 +1,113 @@
++package fr.muscu.app.ui.measurements
++
++import fr.muscu.app.data.Measurement
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class MeasurementProgressTest {
++    private fun measurement(id: Long, day: Long, biceps: Double? = null, shoulders: Double? = null) =
++        Measurement(id = id, epochDay = day, bicepsCm = biceps, shouldersCm = shoulders)
++
++    @Test
++    fun emptyHistoryHasNoPointsAndNoDeltas() {
++        val progress = measureProgress(emptyList(), MeasureType.BICEPS)
++        assertTrue(progress.points.isEmpty())
++        assertNull(progress.latest)
++        assertNull(progress.deltaFromPrevious)
++        assertNull(progress.deltaFromFirst)
++    }
++
++    @Test
++    fun pointsAreSortedByDateAndIgnoreMissingValues() {
++        val all = listOf(
++            measurement(1, day = 200, biceps = 38.5),
++            measurement(2, day = 100, biceps = 37.0, shoulders = 110.0),
++            measurement(3, day = 150, shoulders = 111.0),
++        )
++        assertEquals(
++            listOf(MeasurePoint(100, 37.0), MeasurePoint(200, 38.5)),
++            measurePoints(all, MeasureType.BICEPS),
++        )
++        assertEquals(
++            listOf(MeasurePoint(100, 110.0), MeasurePoint(150, 111.0)),
++            measurePoints(all, MeasureType.SHOULDERS),
++        )
++    }
++
++    @Test
++    fun lastEntryOfTheDayWins() {
++        val all = listOf(
++            measurement(1, day = 100, biceps = 37.0),
++            measurement(3, day = 100, biceps = 38.0),
++            measurement(2, day = 100, biceps = 36.0),
++            measurement(4, day = 101, biceps = 39.0),
++        )
++        assertEquals(
++            listOf(MeasurePoint(100, 38.0), MeasurePoint(101, 39.0)),
++            measurePoints(all, MeasureType.BICEPS),
++        )
++    }
++
++    @Test
++    fun aSingleMeasureHasNoDelta() {
++        val progress = measureProgress(listOf(measurement(1, 100, biceps = 38.0)), MeasureType.BICEPS)
++        assertEquals(38.0, requireNotNull(progress.latest).cm, 0.0)
++        assertNull(progress.deltaFromPrevious)
++        assertNull(progress.deltaFromFirst)
++    }
++
++    @Test
++    fun deltasCompareWithThePreviousAndTheFirstMeasure() {
++        val all = listOf(
++            measurement(1, 100, biceps = 37.0),
++            measurement(2, 110, biceps = 38.5),
++            measurement(3, 120, biceps = 38.0),
++        )
++        val progress = measureProgress(all, MeasureType.BICEPS)
++        assertEquals(-0.5, requireNotNull(progress.deltaFromPrevious), 1e-9)
++        assertEquals(1.0, requireNotNull(progress.deltaFromFirst), 1e-9)
++    }
++
++    @Test
++    fun withTwoMeasuresBothDeltasAreIdentical() {
++        val all = listOf(measurement(1, 100, biceps = 37.0), measurement(2, 110, biceps = 38.0))
++        val progress = measureProgress(all, MeasureType.BICEPS)
++        assertEquals(1.0, requireNotNull(progress.deltaFromPrevious), 1e-9)
++        assertEquals(1.0, requireNotNull(progress.deltaFromFirst), 1e-9)
++    }
++
++    @Test
++    fun deltaIsRoundedToAvoidFloatingPointNoise() {
++        val all = listOf(measurement(1, 100, biceps = 38.5), measurement(2, 110, biceps = 38.6))
++        assertEquals(0.1, requireNotNull(measureProgress(all, MeasureType.BICEPS).deltaFromPrevious), 0.0)
++    }
++
++    @Test
++    fun chartBoundsAddAMarginAndNeverCollapse() {
++        assertEquals(37.0 to 41.0, chartBounds(listOf(MeasurePoint(1, 38.0), MeasurePoint(2, 40.0))))
++        assertEquals(37.0 to 39.0, chartBounds(listOf(MeasurePoint(1, 38.0), MeasurePoint(2, 38.0))))
++        assertEquals(98.0 to 112.0, chartBounds(listOf(MeasurePoint(1, 100.0), MeasurePoint(2, 110.0))))
++    }
++
++    @Test
++    fun blankInputIsEmptyAndAcceptsCommaOrDot() {
++        assertEquals(MeasureInput.Empty, parseMeasure("", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Empty, parseMeasure("   ", MeasureType.SHOULDERS))
++        assertEquals(MeasureInput.Valid(38.5), parseMeasure("38,5", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Valid(38.5), parseMeasure("38.5", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Valid(38.0), parseMeasure("38,04", MeasureType.BICEPS))
++    }
++
++    @Test
++    fun implausibleOrMalformedValuesAreInvalid() {
++        assertEquals(MeasureInput.Invalid, parseMeasure("abc", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Invalid, parseMeasure("5", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Invalid, parseMeasure("385", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Invalid, parseMeasure("30", MeasureType.SHOULDERS))
++        assertEquals(MeasureInput.Invalid, parseMeasure("300", MeasureType.SHOULDERS))
++        assertEquals(MeasureInput.Valid(100.0), parseMeasure("100", MeasureType.BICEPS))
++        assertEquals(MeasureInput.Valid(10.0), parseMeasure("10", MeasureType.BICEPS))
++    }
++}
