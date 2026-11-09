@@ -43,7 +43,8 @@ data class WorkoutEntry(
 data class Measurement(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val epochDay: Long,
-    val bicepsCm: Double? = null,
+    val bicepsLeftCm: Double? = null,
+    val bicepsRightCm: Double? = null,
     val shouldersCm: Double? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )

@@ -85,6 +85,9 @@ import kotlin.math.abs
 
 private const val STEP_CM = 0.5
 
+/** Largeur de la colonne des graduations (valeur + « cm »). */
+private val CHART_AXIS_WIDTH = 56.dp
+
 private val shortDate = DateTimeFormatter.ofPattern("d MMM yyyy", FR)
 private val longDate = DateTimeFormatter.ofPattern("d MMMM yyyy", FR)
 
@@ -110,13 +113,14 @@ fun MeasurementsScreen() {
                     Text("Mensurations", style = MaterialTheme.typography.headlineLarge)
                 }
             }
-            item { ProgressCard(state.biceps, MuscuColors.Primary) }
+            item { ProgressCard(state.bicepsLeft, MuscuColors.Primary) }
+            item { ProgressCard(state.bicepsRight, MuscuColors.gradient(2).first) }
             item { ProgressCard(state.shoulders, MuscuColors.gradient(5).first) }
             item { SectionLabel("Historique", Modifier.padding(top = 12.dp, bottom = 4.dp)) }
             if (state.history.isEmpty()) {
                 item {
                     Text(
-                        "Aucune mesure enregistrée.\nAppuie sur « Ajouter » pour noter ton tour de biceps et d’épaules.",
+                        "Aucune mesure enregistrée.\nAppuie sur « Ajouter » pour noter tes biceps (gauche et droit) et tes épaules.",
                         color = MuscuColors.TextSecondary,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
@@ -143,11 +147,12 @@ fun MeasurementsScreen() {
     sheet?.let { request ->
         MeasurementSheet(
             editing = request.editing,
-            latestBiceps = state.biceps.latest?.cm,
+            latestBicepsLeft = state.bicepsLeft.latest?.cm,
+            latestBicepsRight = state.bicepsRight.latest?.cm,
             latestShoulders = state.shoulders.latest?.cm,
             onDismiss = { sheet = null },
-            onSave = { date, biceps, shoulders ->
-                vm.save(request.editing?.id ?: 0, date, biceps, shoulders)
+            onSave = { date, bicepsLeft, bicepsRight, shoulders ->
+                vm.save(request.editing?.id ?: 0, date, bicepsLeft, bicepsRight, shoulders)
             },
             onDelete = request.editing?.let { m -> { vm.delete(m.id) } },
         )
@@ -249,11 +254,11 @@ private fun MeasureChart(points: List<MeasurePoint>, color: Color, description: 
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().height(140.dp)) {
             Column(
-                Modifier.width(40.dp).fillMaxHeight(),
+                Modifier.width(CHART_AXIS_WIDTH).fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(formatCm(high), color = MuscuColors.TextSecondary, fontSize = 12.sp)
-                Text(formatCm(low), color = MuscuColors.TextSecondary, fontSize = 12.sp)
+                Text("${formatCm(high)} cm", color = MuscuColors.TextSecondary, fontSize = 12.sp)
+                Text("${formatCm(low)} cm", color = MuscuColors.TextSecondary, fontSize = 12.sp)
             }
             Canvas(
                 Modifier
@@ -305,7 +310,7 @@ private fun MeasureChart(points: List<MeasurePoint>, color: Color, description: 
             }
         }
         Row(
-            Modifier.fillMaxWidth().padding(start = 40.dp, top = 4.dp),
+            Modifier.fillMaxWidth().padding(start = CHART_AXIS_WIDTH, top = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(dayLabel(firstDay), color = MuscuColors.TextSecondary, fontSize = 12.sp)
@@ -334,7 +339,8 @@ private fun HistoryCard(measurement: Measurement, onClick: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            measurement.bicepsCm?.let { PerfChip("Biceps ${formatCm(it)} cm") }
+            measurement.bicepsLeftCm?.let { PerfChip("Biceps gauche ${formatCm(it)} cm") }
+            measurement.bicepsRightCm?.let { PerfChip("Biceps droit ${formatCm(it)} cm") }
             measurement.shouldersCm?.let { PerfChip("Épaules ${formatCm(it)} cm") }
         }
     }
@@ -346,10 +352,11 @@ private fun HistoryCard(measurement: Measurement, onClick: () -> Unit) {
 @Composable
 private fun MeasurementSheet(
     editing: Measurement?,
-    latestBiceps: Double?,
+    latestBicepsLeft: Double?,
+    latestBicepsRight: Double?,
     latestShoulders: Double?,
     onDismiss: () -> Unit,
-    onSave: (date: LocalDate, biceps: Double?, shoulders: Double?) -> Unit,
+    onSave: (date: LocalDate, bicepsLeft: Double?, bicepsRight: Double?, shoulders: Double?) -> Unit,
     onDelete: (() -> Unit)?,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -362,15 +369,16 @@ private fun MeasurementSheet(
     }
 
     var date by remember { mutableStateOf(editing?.let { LocalDate.ofEpochDay(it.epochDay) } ?: LocalDate.now()) }
-    var bicepsText by remember { mutableStateOf(editing?.bicepsCm?.let { formatCm(it) } ?: "") }
+    var bicepsLeftText by remember { mutableStateOf(editing?.bicepsLeftCm?.let { formatCm(it) } ?: "") }
+    var bicepsRightText by remember { mutableStateOf(editing?.bicepsRightCm?.let { formatCm(it) } ?: "") }
     var shouldersText by remember { mutableStateOf(editing?.shouldersCm?.let { formatCm(it) } ?: "") }
     var showPicker by remember { mutableStateOf(false) }
 
-    val biceps = parseMeasure(bicepsText, MeasureType.BICEPS)
+    val bicepsLeft = parseMeasure(bicepsLeftText, MeasureType.BICEPS_LEFT)
+    val bicepsRight = parseMeasure(bicepsRightText, MeasureType.BICEPS_RIGHT)
     val shoulders = parseMeasure(shouldersText, MeasureType.SHOULDERS)
-    val canSave = biceps !is MeasureInput.Invalid &&
-        shoulders !is MeasureInput.Invalid &&
-        (biceps is MeasureInput.Valid || shoulders is MeasureInput.Valid)
+    val inputs = listOf(bicepsLeft, bicepsRight, shoulders)
+    val canSave = inputs.none { it is MeasureInput.Invalid } && inputs.any { it is MeasureInput.Valid }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -391,7 +399,8 @@ private fun MeasurementSheet(
 
             DateRow(date = date, onChange = { date = it }, onPick = { showPicker = true })
 
-            MeasureField(MeasureType.BICEPS, bicepsText, { bicepsText = it }, latestBiceps)
+            MeasureField(MeasureType.BICEPS_LEFT, bicepsLeftText, { bicepsLeftText = it }, latestBicepsLeft)
+            MeasureField(MeasureType.BICEPS_RIGHT, bicepsRightText, { bicepsRightText = it }, latestBicepsRight)
             MeasureField(MeasureType.SHOULDERS, shouldersText, { shouldersText = it }, latestShoulders)
 
             PrimaryButton(
@@ -401,7 +410,8 @@ private fun MeasurementSheet(
                     closeThen {
                         onSave(
                             date,
-                            (biceps as? MeasureInput.Valid)?.cm,
+                            (bicepsLeft as? MeasureInput.Valid)?.cm,
+                            (bicepsRight as? MeasureInput.Valid)?.cm,
                             (shoulders as? MeasureInput.Valid)?.cm,
                         )
                     }
@@ -492,28 +502,40 @@ private fun MeasureField(type: MeasureType, text: String, onTextChange: (String)
             .border(1.dp, MuscuColors.Border, RoundedCornerShape(16.dp))
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
+        Text(type.label, color = MuscuColors.TextSecondary)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(type.label, color = MuscuColors.TextSecondary, modifier = Modifier.weight(1f))
             CircleIconButton(Icons.Default.Remove, "Moins", { step(-STEP_CM) }, size = 42.dp)
-            Box(Modifier.width(100.dp), contentAlignment = Alignment.Center) {
-                if (text.isEmpty()) {
-                    Text("—", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = MuscuColors.TextSecondary)
+            Row(
+                Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.width(88.dp), contentAlignment = Alignment.Center) {
+                    if (text.isEmpty()) {
+                        Text("—", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = MuscuColors.TextSecondary)
+                    }
+                    BasicTextField(
+                        value = text,
+                        onValueChange = { new ->
+                            if (new.length <= 5 && new.all { it.isDigit() || it == ',' || it == '.' }) onTextChange(new)
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        textStyle = TextStyle(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            color = if (input is MeasureInput.Invalid) MuscuColors.Danger else MuscuColors.Text,
+                        ),
+                        cursorBrush = SolidColor(MuscuColors.Primary),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                BasicTextField(
-                    value = text,
-                    onValueChange = { new ->
-                        if (new.length <= 5 && new.all { it.isDigit() || it == ',' || it == '.' }) onTextChange(new)
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    textStyle = TextStyle(
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                        color = if (input is MeasureInput.Invalid) MuscuColors.Danger else MuscuColors.Text,
-                    ),
-                    cursorBrush = SolidColor(MuscuColors.Primary),
-                    modifier = Modifier.fillMaxWidth(),
+                Text(
+                    "cm",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MuscuColors.TextSecondary,
                 )
             }
             CircleIconButton(Icons.Default.Add, "Plus", { step(STEP_CM) }, size = 42.dp, repeatOnHold = true)

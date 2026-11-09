@@ -6,7 +6,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
-/** Les deux mensurations suivies, avec la plage de valeurs jugée plausible pour détecter les fautes de frappe. */
+/** Les mensurations suivies, avec la plage de valeurs jugée plausible pour détecter les fautes de frappe. */
 enum class MeasureType(
     val label: String,
     val min: Double,
@@ -14,11 +14,13 @@ enum class MeasureType(
     /** Valeur proposée au premier appui sur « + » quand aucune mesure n'existe encore. */
     val startValue: Double,
 ) {
-    BICEPS("Tour de biceps", min = 10.0, max = 100.0, startValue = 35.0),
-    SHOULDERS("Tour d’épaules", min = 50.0, max = 250.0, startValue = 110.0);
+    BICEPS_LEFT("Biceps gauche", min = 10.0, max = 100.0, startValue = 35.0),
+    BICEPS_RIGHT("Biceps droit", min = 10.0, max = 100.0, startValue = 35.0),
+    SHOULDERS("Épaules", min = 50.0, max = 250.0, startValue = 110.0);
 
     fun valueOf(measurement: Measurement): Double? = when (this) {
-        BICEPS -> measurement.bicepsCm
+        BICEPS_LEFT -> measurement.bicepsLeftCm
+        BICEPS_RIGHT -> measurement.bicepsRightCm
         SHOULDERS -> measurement.shouldersCm
     }
 }

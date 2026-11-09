@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Exercise::class, WorkoutEntry::class, Measurement::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -47,6 +47,30 @@ abstract class AppDatabase : RoomDatabase() {
                                 "shouldersCm REAL, " +
                                 "createdAt INTEGER NOT NULL)"
                         )
+                        db.execSQL(
+                            "CREATE INDEX IF NOT EXISTS index_measurements_epochDay ON measurements (epochDay)"
+                        )
+                    }
+                }, object : Migration(4, 5) {
+                    // Biceps gauche / droit séparés. Les anciennes valeurs « biceps » (sans côté)
+                    // sont conservées comme biceps droit. La table est recréée : Room refuse une
+                    // colonne résiduelle (bicepsCm) absente de l'entité.
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                            "CREATE TABLE measurements_new (" +
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                "epochDay INTEGER NOT NULL, " +
+                                "bicepsLeftCm REAL, " +
+                                "bicepsRightCm REAL, " +
+                                "shouldersCm REAL, " +
+                                "createdAt INTEGER NOT NULL)"
+                        )
+                        db.execSQL(
+                            "INSERT INTO measurements_new (id, epochDay, bicepsLeftCm, bicepsRightCm, shouldersCm, createdAt) " +
+                                "SELECT id, epochDay, NULL, bicepsCm, shouldersCm, createdAt FROM measurements"
+                        )
+                        db.execSQL("DROP TABLE measurements")
+                        db.execSQL("ALTER TABLE measurements_new RENAME TO measurements")
                         db.execSQL(
                             "CREATE INDEX IF NOT EXISTS index_measurements_epochDay ON measurements (epochDay)"
                         )

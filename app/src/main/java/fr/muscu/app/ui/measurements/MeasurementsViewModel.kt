@@ -13,7 +13,8 @@ import java.time.LocalDate
 data class MeasurementsUiState(
     /** Toutes les prises de mensurations, de la plus récente à la plus ancienne. */
     val history: List<Measurement> = emptyList(),
-    val biceps: MeasureProgress = MeasureProgress(MeasureType.BICEPS, emptyList()),
+    val bicepsLeft: MeasureProgress = MeasureProgress(MeasureType.BICEPS_LEFT, emptyList()),
+    val bicepsRight: MeasureProgress = MeasureProgress(MeasureType.BICEPS_RIGHT, emptyList()),
     val shoulders: MeasureProgress = MeasureProgress(MeasureType.SHOULDERS, emptyList()),
 )
 
@@ -24,13 +25,14 @@ class MeasurementsViewModel(private val repo: MuscuRepository) : ViewModel() {
             history = all.sortedWith(
                 compareByDescending<Measurement> { it.epochDay }.thenByDescending { it.id }
             ),
-            biceps = measureProgress(all, MeasureType.BICEPS),
+            bicepsLeft = measureProgress(all, MeasureType.BICEPS_LEFT),
+            bicepsRight = measureProgress(all, MeasureType.BICEPS_RIGHT),
             shoulders = measureProgress(all, MeasureType.SHOULDERS),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MeasurementsUiState())
 
-    fun save(id: Long, date: LocalDate, bicepsCm: Double?, shouldersCm: Double?) {
-        viewModelScope.launch { repo.saveMeasurement(id, date, bicepsCm, shouldersCm) }
+    fun save(id: Long, date: LocalDate, bicepsLeftCm: Double?, bicepsRightCm: Double?, shouldersCm: Double?) {
+        viewModelScope.launch { repo.saveMeasurement(id, date, bicepsLeftCm, bicepsRightCm, shouldersCm) }
     }
 
     fun delete(id: Long) {

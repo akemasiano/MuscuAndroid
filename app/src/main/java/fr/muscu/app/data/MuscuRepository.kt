@@ -72,11 +72,18 @@ class MuscuRepository(
 
     // --- Mensurations ---
 
-    suspend fun saveMeasurement(id: Long, date: LocalDate, bicepsCm: Double?, shouldersCm: Double?) {
+    suspend fun saveMeasurement(
+        id: Long,
+        date: LocalDate,
+        bicepsLeftCm: Double?,
+        bicepsRightCm: Double?,
+        shouldersCm: Double?,
+    ) {
         val measurement = Measurement(
             id = id,
             epochDay = date.toEpochDay(),
-            bicepsCm = bicepsCm,
+            bicepsLeftCm = bicepsLeftCm,
+            bicepsRightCm = bicepsRightCm,
             shouldersCm = shouldersCm,
         )
         if (id == 0L) measurementDao.insert(measurement) else measurementDao.update(measurement)
