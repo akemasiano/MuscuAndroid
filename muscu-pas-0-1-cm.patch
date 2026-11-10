@@ -1,0 +1,56 @@
+From 7dd2b3ff301da984cee2487b478b81ea0dd685b8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 18:53:49 +0100
+Subject: [PATCH] Mensurations : pas de 0,1 cm au lieu de 0,5 cm
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Les boutons − / + des biceps gauche, biceps droit et épaules font varier
+la valeur de 0,1 cm (au lieu de 0,5 cm). README mis à jour.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013CyH8WBcDnL6MVdeCd5wSz
+---
+ README.md                                                     | 2 +-
+ .../java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt   | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/README.md b/README.md
+index 59b7160..a6441af 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,7 @@ Application Android (Kotlin, Jetpack Compose, Room) pour suivre ses séances sem
+ - **Série de semaines** : badge flamme à côté du numéro de semaine, sans progression affichée. Une semaine (lundi → dimanche) est validée avec au moins **3 exercices différents** ; répéter le même exercice ne compte qu'une fois. Le badge indique le nombre de semaines validées consécutives à la semaine consultée. La semaine en cours conserve la série précédente jusqu'au dimanche si elle n'est pas encore validée ; une semaine terminée non validée remet le compteur à zéro. Les entrées datées dans le futur ne comptent pas et le compteur des semaines futures reste à zéro.
+ - **Ajouter à la séance** : choix de l'exercice, séries / répétitions / poids (pas de 0,25 kg, appui prolongé sur + pour augmenter le poids en continu jusqu'au relâchement, saisie libre possible), **pré-remplissage automatique avec la dernière valeur saisie pour cet exercice**. Un appui sur une entrée permet de la modifier ou la supprimer.
+ - **Ancienneté des exercices** : visible dans la liste de choix et sous l'exercice sélectionné avant l'ajout : « Utilisé cette semaine », « Dernière utilisation : la semaine dernière », « Dernière utilisation : il y a N semaines » ou « Jamais utilisé ». Le calcul compare les semaines du lundi au dimanche par rapport à la date de la séance choisie ; les séances postérieures à cette date et l'entrée en cours de modification sont exclues. « Jamais utilisé » signifie donc aucune utilisation dans l'historique retenu à cette date. Le préremplissage des performances reste inchangé.
+-- **Mensurations** : onglet « Mesures » pour suivre le **tour de biceps gauche**, le **tour de biceps droit** (mesurés séparément) et le **tour d'épaules**, avec l'unité (cm) toujours affichée. Chaque prise de mesures est datée (date modifiable, jamais dans le futur) et peut ne contenir qu'une ou deux des trois valeurs ; les champs laissés vides ne sont pas enregistrés. Saisie libre ou par pas de 0,5 cm (appui prolongé sur +), avec contrôle des valeurs plausibles (biceps 10–100 cm, épaules 50–250 cm). Pour chaque mesure : dernière valeur, variation depuis la mesure précédente et depuis la toute première, et courbe d'évolution dont l'axe horizontal est proportionnel au temps réel. Si plusieurs saisies ont lieu le même jour, la plus récente est retenue pour la courbe. L'historique permet de modifier ou supprimer une prise de mesures.
++- **Mensurations** : onglet « Mesures » pour suivre le **tour de biceps gauche**, le **tour de biceps droit** (mesurés séparément) et le **tour d'épaules**, avec l'unité (cm) toujours affichée. Chaque prise de mesures est datée (date modifiable, jamais dans le futur) et peut ne contenir qu'une ou deux des trois valeurs ; les champs laissés vides ne sont pas enregistrés. Saisie libre ou par pas de 0,1 cm (appui prolongé sur +), avec contrôle des valeurs plausibles (biceps 10–100 cm, épaules 50–250 cm). Pour chaque mesure : dernière valeur, variation depuis la mesure précédente et depuis la toute première, et courbe d'évolution dont l'axe horizontal est proportionnel au temps réel. Si plusieurs saisies ont lieu le même jour, la plus récente est retenue pour la courbe. L'historique permet de modifier ou supprimer une prise de mesures.
+ - **Mes exercices** : bibliothèque avec recherche (insensible aux accents), dernière performance et ancienneté.
+ - **Catalogue intégré** : 20 exercices illustrés prêts à sélectionner, avec 40 images Départ / Fin embarquées dans l'APK et disponibles hors ligne. Les planches fournies sont séparées, leurs titres retirés et les deux phases gardent la même échelle, sans agrandissement.
+ - **Nouvel exercice** : nom, couleur, deux images facultatives **Départ / Fin** depuis la galerie ou l'appareil photo ; remplacement, retrait indépendant et inversion des phases.
+diff --git a/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt
+index 1e8024d..1c6acc4 100644
+--- a/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt
++++ b/app/src/main/java/fr/muscu/app/ui/measurements/MeasurementsScreen.kt
+@@ -83,7 +83,7 @@ import java.time.ZoneOffset
+ import java.time.format.DateTimeFormatter
+ import kotlin.math.abs
+ 
+-private const val STEP_CM = 0.5
++private const val STEP_CM = 0.1
+ 
+ /** Largeur de la colonne des graduations (valeur + « cm »). */
+ private val CHART_AXIS_WIDTH = 56.dp
+@@ -487,7 +487,7 @@ private fun DateRow(date: LocalDate, onChange: (LocalDate) -> Unit, onPick: () -
+ private fun MeasureField(type: MeasureType, text: String, onTextChange: (String) -> Unit, last: Double?) {
+     val input = parseMeasure(text, type)
+ 
+-    // Champ vide : le premier appui reprend la dernière mesure connue, les suivants varient de 0,5 cm.
++    // Champ vide : le premier appui reprend la dernière mesure connue, les suivants varient de 0,1 cm.
+     fun step(delta: Double) {
+         val current = (input as? MeasureInput.Valid)?.cm
+         val next = if (current == null) last ?: type.startValue else current + delta
+-- 
+2.43.0
+

@@ -83,7 +83,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
-private const val STEP_CM = 0.5
+private const val STEP_CM = 0.1
 
 /** Largeur de la colonne des graduations (valeur + « cm »). */
 private val CHART_AXIS_WIDTH = 56.dp
@@ -487,7 +487,7 @@ private fun DateRow(date: LocalDate, onChange: (LocalDate) -> Unit, onPick: () -
 private fun MeasureField(type: MeasureType, text: String, onTextChange: (String) -> Unit, last: Double?) {
     val input = parseMeasure(text, type)
 
-    // Champ vide : le premier appui reprend la dernière mesure connue, les suivants varient de 0,5 cm.
+    // Champ vide : le premier appui reprend la dernière mesure connue, les suivants varient de 0,1 cm.
     fun step(delta: Double) {
         val current = (input as? MeasureInput.Valid)?.cm
         val next = if (current == null) last ?: type.startValue else current + delta
