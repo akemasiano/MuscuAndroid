@@ -91,7 +91,27 @@ Sans cette étape, l'APK est signé avec une clé temporaire différente à chaq
 - Pour la relancer manuellement : onglet **Actions → Build APK → Run workflow**.
 - Si Actions est désactivé : onglet **Actions → « I understand my workflows, go ahead and enable them »**.
 
-### 5. Télécharger l'APK
+### 5. Recevoir l'APK directement sur Telegram (optionnel)
+
+1. Dans Telegram, créez un bot avec [@BotFather](https://t.me/BotFather) (`/newbot`) puis gardez précieusement son jeton.
+2. Ouvrez une discussion avec ce bot et envoyez-lui `/start`. Pour un groupe, ajoutez-y le bot puis envoyez un message dans le groupe.
+3. Depuis un terminal local, récupérez l'identifiant de la discussion (sans publier le jeton) :
+
+   ```bash
+   curl "https://api.telegram.org/bot<VOTRE_JETON>/getUpdates"
+   ```
+
+   Relevez la valeur `chat.id` correspondant à votre message ou à votre groupe. Pour un groupe, cet identifiant est généralement négatif.
+4. Sur GitHub : **Settings → Secrets and variables → Actions → New repository secret**, créez ces deux secrets :
+
+   | Secret | Valeur |
+   |---|---|
+   | `TELEGRAM_BOT_TOKEN` | le jeton créé par BotFather |
+   | `TELEGRAM_CHAT_ID` | la valeur `chat.id` relevée à l'étape précédente |
+
+À chaque compilation lancée par un push, un tag ou **Run workflow**, le bot vous enverra le fichier APK comme document Telegram. Les exécutions de pull request ne l'envoient jamais, par sécurité. Si les deux secrets ne sont pas configurés, le workflow continue et conserve l'APK dans les artefacts GitHub.
+
+### 6. Télécharger l'APK
 1. Onglet **Actions** → cliquer sur la dernière exécution (coche verte, ~5 min).
 2. En bas de la page, section **Artifacts** → **muscu-apk** (fichier `.zip` contenant `muscu-N.apk`).
 
@@ -102,7 +122,7 @@ git push origin v1.0
 ```
 → onglet **Releases** du dépôt.
 
-### 6. Installer sur le téléphone
+### 7. Installer sur le téléphone
 1. Transférer `muscu-N.apk` sur le téléphone (câble, Drive, mail…) et l'ouvrir.
 2. Autoriser « Installer des applications inconnues » pour l'application utilisée (Fichiers, Chrome…).
 3. Si Play Protect affiche un avertissement : **Plus de détails → Installer quand même**.

@@ -59,6 +59,27 @@ jobs:
           path: dist/*.apk
           retention-days: 30
 
+      - name: Envoyer l'APK sur Telegram
+        # Les secrets ne sont volontairement jamais transmis aux pull requests.
+        if: github.event_name != 'pull_request'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::warning::Secrets Telegram absents : l'APK reste disponible dans les artefacts GitHub."
+            exit 0
+          fi
+
+          apk_file=$(find dist -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk_file"
+
+          curl --fail --silent --show-error \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            --form "chat_id=${TELEGRAM_CHAT_ID}" \
+            --form "document=@${apk_file}" \
+            --form "caption=Muscu APK — build #${GITHUB_RUN_NUMBER}"
+
       - name: Créer une Release GitHub (sur tag v*)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
