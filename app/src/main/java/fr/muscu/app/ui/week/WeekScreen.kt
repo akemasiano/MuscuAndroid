@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,10 +25,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -151,7 +149,6 @@ fun WeekScreen(onCreateExercise: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeekHeader(
     weekStart: LocalDate,
@@ -163,21 +160,21 @@ private fun WeekHeader(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SectionLabel("Semaine ${weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}")
-                    Spacer(Modifier.width(8.dp))
-                    WeeklyStreakBadge(streak)
-                }
-                if (!isCurrentWeek) {
-                    TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Text("Aujourd’hui", color = MuscuColors.Primary)
-                    }
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("Semaine ${weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}")
+                Spacer(Modifier.width(8.dp))
+                WeeklyStreakBadge(streak)
             }
             Text(weekTitle(weekStart), style = MaterialTheme.typography.headlineLarge)
         }
         CircleIconButton(Icons.Default.ChevronLeft, "Semaine précédente", onPrevious)
+        Spacer(Modifier.width(10.dp))
+        CircleIconButton(
+            icon = Icons.Default.Today,
+            contentDescription = if (isCurrentWeek) "Semaine en cours" else "Revenir à la semaine en cours",
+            onClick = onToday,
+            enabled = !isCurrentWeek,
+        )
         Spacer(Modifier.width(10.dp))
         CircleIconButton(Icons.Default.ChevronRight, "Semaine suivante", onNext)
     }
