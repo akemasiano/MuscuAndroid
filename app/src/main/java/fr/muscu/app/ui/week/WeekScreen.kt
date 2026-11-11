@@ -24,8 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -170,7 +170,7 @@ private fun WeekHeader(
         CircleIconButton(Icons.Default.ChevronLeft, "Semaine précédente", onPrevious)
         Spacer(Modifier.width(10.dp))
         CircleIconButton(
-            icon = Icons.Default.Today,
+            icon = Icons.Default.Home,
             contentDescription = if (isCurrentWeek) "Semaine en cours" else "Revenir à la semaine en cours",
             onClick = onToday,
             enabled = !isCurrentWeek,
